@@ -91,18 +91,18 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import { useDark } from '@vueuse/core'
-import { 
-  ChatBubbleLeftRightIcon, 
-  PaperAirplaneIcon,
-  PlusIcon,
-  PaperClipIcon,
+import {nextTick, onMounted, ref} from 'vue'
+import {useDark} from '@vueuse/core'
+import {
+  ChatBubbleLeftRightIcon,
   DocumentIcon,
+  PaperAirplaneIcon,
+  PaperClipIcon,
+  PlusIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
 import ChatMessage from '../components/ChatMessage.vue'
-import { chatAPI } from '../services/api'
+import {chatAPI} from '../services/api'
 
 const isDark = useDark()
 const messagesRef = ref(null)
@@ -269,7 +269,7 @@ const sendMessage = async () => {
   // 添加用户消息
   const userMessage = {
     senderType: 0,
-    content: messageContent,
+    contents: messageContent,
     timestamp: new Date()
   }
   currentMessages.value.push(userMessage)
@@ -291,47 +291,43 @@ const sendMessage = async () => {
   // 添加助手消息占位
   const assistantMessage = {
     senderType: 1,
-    content: '',
+    contents: '',
     timestamp: new Date()
   }
   currentMessages.value.push(assistantMessage)
+
+  console .log('发送数据:', currentMessages)
   isStreaming.value = true
 
+  // 监听流式数据事件
+  const handleStreamData = (event) => {
+    const { data } = event.detail
+    assistantMessage.contents += data
+
+    // 更新消息内容
+    const lastIndex = currentMessages.value.length - 1
+    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
+    scrollToBottom()
+  }
+
+  // 添加事件监听器
+  window.addEventListener('streamData', handleStreamData)
+
   try {
-    const reader = await chatAPI.sendMessage(formData, currentChatId.value)
-    const decoder = new TextDecoder('utf-8')
-    let accumulatedContent = ''  // 添加累积内容变量
-
-    while (true) {
-      try {
-        const { value, done } = await reader.read()
-        if (done) break
-
-        // 累积新内容
-        accumulatedContent += decoder.decode(value)  // 追加新内容
-
-        await nextTick(() => {
-          // 更新消息，使用累积的内容
-          const updatedMessage = {
-            ...assistantMessage,
-            content: accumulatedContent  // 使用累积的内容
-          }
-          const lastIndex = currentMessages.value.length - 1
-          currentMessages.value.splice(lastIndex, 1, updatedMessage)
-        })
-        await scrollToBottom()
-      } catch (readError) {
-        console.error('读取流错误:', readError)
-        break
-      }
-    }
+    await chatAPI.sendMessage(formData, currentChatId.value)
   } catch (error) {
     console.error('发送消息失败:', error)
     assistantMessage.content = '抱歉，发生了错误，请稍后重试。'
+    const lastIndex = currentMessages.value.length - 1
+    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
   } finally {
     isStreaming.value = false
     selectedFiles.value = [] // 清空已选文件
     fileInput.value.value = '' // 清空文件输入
+
+    // 移除事件监听器
+    window.removeEventListener('streamData', handleStreamData)
+
     await scrollToBottom()
   }
 }
@@ -340,8 +336,7 @@ const sendMessage = async () => {
 const loadChat = async (chatId) => {
   currentChatId.value = chatId
   try {
-    const messages = await chatAPI.getChatMessages(chatId)
-    currentMessages.value = messages
+    currentMessages.value = await chatAPI.getChatMessages(chatId)
     console.log('加载对话消息成功:', currentMessages)
     await scrollToBottom()
   } catch (error) {

@@ -1,38 +1,111 @@
 const BASE_URL = 'http://localhost'
 
 const token = localStorage.getItem('token')
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 
 export const chatAPI = {
 
-  // 发送聊天消息
-  async sendMessage(data, chatId) {
-    try {
-      const url = new URL(`${BASE_URL}/api/v1/assistant/chat`)
-      if (chatId) {
-        url.searchParams.append('session', chatId)
-      }
+  async sendMessage(data, sessionId) {
+    const url = new URL(`${BASE_URL}/api/v1/assistant/chat`);
+    if (sessionId) {
+      url.searchParams.append('session', sessionId);
+    }
 
-      const message = data.get(`prompt`)
+    const message = data.get('prompt');
 
-      const response = await fetch(url, {
+    console.debug('[SSE] 发送消息:', {
+      url: url.toString(),
+      sessionId,
+      message: message ? `${message.substring(0, 50)}...` : message, // 避免日志过长
+      timestamp: new Date().toISOString()
+    });
+
+    return new Promise((resolve, reject) => {
+      const controller = new AbortController();
+      const startTime = Date.now();
+
+      console.debug('[SSE] 开始建立 SSE 连接...', { signal: controller.signal });
+
+      fetchEventSource(url, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'Authorization': token
         },
-        // body: data instanceof FormData ? data :
-        //   new URLSearchParams({ prompt: data })
-        body: JSON.stringify({ message: message }),
-      })
+        body: JSON.stringify({ message }),
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
+        // 使用 AbortSignal, 用于取消连接
+        signal: controller.signal,
 
-      return response.body.getReader()
-    } catch (error) {
-      console.error('API Error:', error)
-      throw error
-    }
+        async onopen(response) {
+          const duration = Date.now() - startTime;
+          console.debug(`[SSE] 连接打开 (耗时: ${duration}ms)`, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries()),
+            url: url.toString()
+          });
+
+          if (response.ok && response.headers.get('content-type')?.includes('text/event-stream')) {
+            return; // 正常，继续接收事件
+          } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            console.warn('[SSE] 客户端错误，不重试', { status: response.status });
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          } else {
+            console.warn('[SSE] 服务端错误，可能重试', { status: response.status });
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+        },
+
+        onmessage(event) {
+          const eventData = event.data;
+
+          if (eventData === '[DONE]') {
+            const duration = Date.now() - startTime;
+            console.debug(`[SSE] 收到结束信号 [DONE] (总耗时: ${duration}ms)`);
+            controller.abort(); // 关闭连接
+            resolve();
+            return;
+          }
+
+          console.debug('[SSE] 收到消息:', {
+            data: eventData,
+            eventId: event.id,
+            eventType: event.event,
+            timestamp: new Date().toISOString()
+          });
+
+          // 触发自定义事件，传递数据
+          window.dispatchEvent(new CustomEvent('streamData', {
+            detail: { data: eventData }
+          }));
+        },
+
+        onerror(err) {
+          const duration = Date.now() - startTime;
+          console.error(`[SSE] 连接错误 (持续时间: ${duration}ms):`, err);
+
+          // 判断是否为 AbortError（手动取消或网络中断）
+          if (err.name === 'AbortError') {
+            console.debug('[SSE] 连接已中止 (AbortError)', { reason: controller.signal.reason });
+            // 通常 resolve 而非 reject，表示正常结束
+            resolve();
+          } else {
+            controller.abort(); // 确保连接关闭
+            reject(err); // 抛出错误
+          }
+        },
+
+        onclose() {
+          const duration = Date.now() - startTime;
+          console.debug(`[SSE] 连接关闭 (总耗时: ${duration}ms)`);
+          // 可在此处理重连逻辑（如果需要）
+          resolve(); // 正常关闭
+        }
+      });
+    });
   },
 
   // 获取聊天历史列表

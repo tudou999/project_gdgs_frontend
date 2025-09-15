@@ -195,6 +195,10 @@ const props = defineProps({
   message: {
     type: Object,
     required: true
+  },
+  isStreaming: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -392,6 +396,13 @@ const formatTime = (timestamp) => {
 
       .cursor {
         animation: blink 1s infinite;
+      }
+
+      .typing-cursor {
+        animation: blink 1s infinite;
+        color: #007CF0;
+        font-weight: bold;
+        margin-left: 2px;
       }
 
       :deep(.think-block) {

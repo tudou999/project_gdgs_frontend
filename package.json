@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@pdftron/webviewer": "^11.3.0",
     "@vueuse/components": "^12.7.0",
     "@vueuse/core": "^12.7.0",
