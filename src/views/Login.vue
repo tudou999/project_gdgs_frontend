@@ -74,7 +74,7 @@
         <div class="login-footer">
           <p class="register-text">
             还没有账号？
-            <a href="#" class="register-link">立即注册</a>
+            <a href="#" class="register-link" @click.prevent="handleRegister">立即注册</a>
           </p>
         </div>
       </form>
@@ -83,11 +83,11 @@
 </template>
 
 <script setup>
-// TODO: 注册功能，忘记密码功能
+// TODO: 注册功能
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDark } from '@vueuse/core'
-import { LoginAPI } from '../services/user.js'
+import { SginAPI } from '../services/user.js'
 import { ElMessage } from 'element-plus'
 
 const isDark = useDark()
@@ -109,7 +109,7 @@ const handleLogin = async () => {
   isLoading.value = true
 
   try {
-    const responseJson = await LoginAPI.login(loginForm.value)
+    const responseJson = await SginAPI.login(loginForm.value)
 
     if (responseJson.code === 200) {
       router.push('/home')
@@ -126,6 +126,11 @@ const handleLogin = async () => {
   } finally {
     isLoading.value = false
   }
+}
+
+// 跳转到注册页面
+const handleRegister = () => {
+  router.push('/register')
 }
 </script>
 
