@@ -74,7 +74,7 @@
         <div class="login-footer">
           <p class="register-text">
             还没有账号？
-            <a href="#" class="register-link" @click.prevent="handleRegister">立即注册</a>
+            <a href="#" class="register-link" @click.prevent="gotoRegister">立即注册</a>
           </p>
         </div>
       </form>
@@ -83,7 +83,6 @@
 </template>
 
 <script setup>
-// TODO: 注册功能
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDark } from '@vueuse/core'
@@ -129,7 +128,7 @@ const handleLogin = async () => {
 }
 
 // 跳转到注册页面
-const handleRegister = () => {
+const gotoRegister = () => {
   router.push('/register')
 }
 </script>
