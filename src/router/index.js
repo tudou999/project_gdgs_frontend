@@ -1,46 +1,56 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import GameChat from '../views/GameChat.vue'
+
+// 懒加载组件封装，支持错误处理
+function lazyLoad(view) {
+  return () => import(`../views/${view}.vue`).catch(() => {
+    console.error(`Failed to load view: ${view}`)
+  })
+}
 
 const routes = [
   {
+    path: '/',
+    redirect: '/login'
+  },
+  {
     path: '/home',
     name: 'Home',
-    component: () => import('../views/Home.vue')
+    component: lazyLoad('Home')
   },
   {
     path: '/ai-chat',
     name: 'AIChat',
-    component: () => import('../views/AIChat.vue')
+    component: lazyLoad('AIChat')
   },
   {
     path: '/comfort-simulator',
     name: 'ComfortSimulator',
-    component: () => import('../views/ComfortSimulator.vue')
+    component: lazyLoad('ComfortSimulator')
   },
   {
     path: '/customer-service',
     name: 'CustomerService',
-    component: () => import('../views/CustomerService.vue')
+    component: lazyLoad('CustomerService')
   },
   {
     path: '/chat-pdf',
     name: 'ChatPDF',
-    component: () => import('../views/ChatPDF.vue')
+    component: lazyLoad('ChatPDF')
   },
   {
     path: '/game',
-    name: 'game',
-    component: () => import('../views/GameChat.vue')
+    name: 'Game', // 修改为大写开头，保持命名一致性
+    component: lazyLoad('GameChat')
   },
   {
-    path: '/',
+    path: '/login',
     name: 'Login',
-    component: () => import('../views/Login.vue')
+    component: lazyLoad('Login')
   },
   {
     path: '/register',
     name: 'Register',
-    component: () => import('../views/Register.vue')
+    component: lazyLoad('Register')
   }
 ]
 
@@ -49,4 +59,4 @@ const router = createRouter({
   routes
 })
 
-export default router 
+export default router

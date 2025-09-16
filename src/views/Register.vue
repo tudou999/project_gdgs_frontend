@@ -99,7 +99,7 @@
         <div class="register-footer">
           <p class="login-text">
             已有账号？
-            <a href="#" class="login-link" @click.prevent="handleLogin">立即登录</a>
+            <a href="#" class="login-link" @click.prevent="gotoLogin">立即登录</a>
           </p>
         </div>
       </form>
@@ -136,20 +136,19 @@ const handleRegister = async () => {
     if (response.code === 200) {
       router.push('/home')
       ElMessage.success('注册成功！')
-      router.push('/')
     } else {
       ElMessage.error(response.msg)
     }
   } catch (error) {
-    ElMessage.warning('注册失败，请稍后重试。')
+    ElMessage.warning('注册失败，请联系管理员。')
   } finally {
     isLoading.value = false
   }
 }
 
 // 跳转到登录页面
-const handleLogin = () => {
-  router.push('/')
+const gotoLogin = () => {
+  router.push('/login')
 }
 </script>
 

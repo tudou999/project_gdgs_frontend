@@ -27,7 +27,7 @@ router.beforeEach((to, from, next) => {
 <template>
   <div class="app" :class="{ 'dark': isDark }">
     <nav class="navbar">
-      <router-link to="/" class="logo">CORS智能助手</router-link>
+      <router-link to="/login" class="logo">CORS智能助手</router-link>
       <button @click="toggleDark()" class="theme-toggle">
         <SunIcon v-if="isDark" class="icon" />
         <MoonIcon v-else class="icon" />

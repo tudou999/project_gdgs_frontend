@@ -122,7 +122,7 @@ const handleLogin = async () => {
       ElMessage.error(responseJson.msg)
     }
   } catch (error) {
-    ElMessage.warning('网络错误！请联系管理员')
+    ElMessage.warning('登录失败！请联系管理员')
   } finally {
     isLoading.value = false
   }
