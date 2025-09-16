@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { RouterLink, RouterView } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
-import { SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
+import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
@@ -12,6 +12,34 @@ const router = useRouter()
 // 添加全局状态来跟踪当前路由
 const currentRoute = ref(router.currentRoute.value.path)
 
+// 登录状态管理
+const isLoggedIn = ref(false)
+
+// 检查登录状态
+const checkLoginStatus = () => {
+  const token = localStorage.getItem('token')
+  // 如果缓存中有token，value为true，否则为false
+  isLoggedIn.value = !!token
+}
+
+// 退出登录（清楚缓存中的token）
+const handleLogout = () => {
+  localStorage.removeItem('token')
+  isLoggedIn.value = false
+  // 重定向到登录页面
+  router.push('/login')
+}
+
+// 计算是否显示退出按钮（登录和注册页面不显示）
+const showLogoutButton = computed(() => {
+  return isLoggedIn.value && currentRoute.value !== '/login' && currentRoute.value !== '/register'
+})
+
+// 组件挂载时检查登录状态
+onMounted(() => {
+  checkLoginStatus()
+})
+
 // 添加全局路由守卫
 router.beforeEach((to, from, next) => {
   // 如果是从 ChatPDF 页面离开
@@ -19,6 +47,23 @@ router.beforeEach((to, from, next) => {
     // 触发一个自定义事件，让 ChatPDF 组件知道要清理资源
     window.dispatchEvent(new CustomEvent('cleanupChatPDF'))
   }
+  
+  // 检查登录状态
+  checkLoginStatus()
+  
+  // 如果用户未登录且访问需要登录的页面，重定向到登录页
+  const publicRoutes = ['/login', '/register']
+  if (!isLoggedIn.value && !publicRoutes.includes(to.path)) {
+    next('/login')
+    return
+  }
+  
+  // 如果用户已登录且访问登录/注册页面，重定向到首页
+  if (isLoggedIn.value && (to.path === '/login' || to.path === '/register')) {
+    next('/home')
+    return
+  }
+  
   currentRoute.value = to.path
   next()
 })
@@ -27,11 +72,22 @@ router.beforeEach((to, from, next) => {
 <template>
   <div class="app" :class="{ 'dark': isDark }">
     <nav class="navbar">
-      <router-link to="/login" class="logo">CORS智能助手</router-link>
-      <button @click="toggleDark()" class="theme-toggle">
-        <SunIcon v-if="isDark" class="icon" />
-        <MoonIcon v-else class="icon" />
-      </button>
+      <router-link to="/home" class="logo">CORS智能助手</router-link>
+      <div class="navbar-actions">
+        <button @click="toggleDark()" class="theme-toggle">
+          <SunIcon v-if="isDark" class="icon" />
+          <MoonIcon v-else class="icon" />
+        </button>
+        <button 
+          v-if="showLogoutButton" 
+          @click="handleLogout" 
+          class="logout-button"
+          title="退出登录"
+        >
+          <ArrowRightOnRectangleIcon class="icon" />
+          <span class="logout-text">退出登录</span>
+        </button>
+      </div>
     </nav>
     <router-view v-slot="{ Component }">
       <transition name="fade" mode="out-in">
@@ -98,6 +154,12 @@ body {
     -webkit-text-fill-color: transparent;
   }
 
+  .navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
   .theme-toggle {
     background: none;
     border: none;
@@ -117,9 +179,52 @@ body {
     }
   }
 
+  .logout-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    color: #dc2626;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: rgba(220, 38, 38, 0.2);
+      border-color: rgba(220, 38, 38, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    .logout-text {
+      @media (max-width: 768px) {
+        display: none;
+      }
+    }
+  }
+
   .dark & {
     background: rgba(0, 0, 0, 0.2);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+
+    .logout-button {
+      background: rgba(220, 38, 38, 0.15);
+      border-color: rgba(220, 38, 38, 0.3);
+      color: #f87171;
+
+      &:hover {
+        background: rgba(220, 38, 38, 0.25);
+        border-color: rgba(220, 38, 38, 0.4);
+      }
+    }
   }
 }
 
@@ -136,6 +241,18 @@ body {
 @media (max-width: 768px) {
   .navbar {
     padding: 1rem;
+
+    .navbar-actions {
+      gap: 0.25rem;
+    }
+
+    .logout-button {
+      padding: 0.5rem;
+      
+      .logout-text {
+        display: none;
+      }
+    }
   }
 }
 </style>

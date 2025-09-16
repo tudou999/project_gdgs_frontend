@@ -39,7 +39,7 @@ const routes = [
   },
   {
     path: '/game',
-    name: 'Game', // 修改为大写开头，保持命名一致性
+    name: 'Game',
     component: lazyLoad('GameChat')
   },
   {
