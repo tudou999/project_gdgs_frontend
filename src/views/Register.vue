@@ -108,11 +108,15 @@
 </template>
 
 <script setup>
+defineOptions ({
+  name: 'Register'
+})
+
 // TODO: 注册功能实现
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDark } from '@vueuse/core'
-import { SginAPI } from '../services/user.js'
+import { SignAPI } from '../services/user.js'
 import {ElMessage} from "element-plus";
 
 const isDark = useDark()
@@ -132,7 +136,7 @@ const isLoading = ref(false)
 const handleRegister = async () => {
   isLoading.value = true
   try {
-    const response = await SginAPI.register(registerForm.value)
+    const response = await SignAPI.register(registerForm.value)
     if (response.code === 200) {
       router.push('/home')
       ElMessage.success('注册成功！')

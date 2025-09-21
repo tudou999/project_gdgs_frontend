@@ -4,6 +4,7 @@ import { useDark, useToggle } from '@vueuse/core'
 import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
+import {User, SwitchButton} from "@element-plus/icons-vue";
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
@@ -22,7 +23,7 @@ const checkLoginStatus = () => {
   isLoggedIn.value = !!token
 }
 
-// 退出登录（清楚缓存中的token）
+// 退出登录（清除缓存中的token）
 const handleLogout = () => {
   localStorage.removeItem('token')
   isLoggedIn.value = false
@@ -30,10 +31,15 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-// 计算是否显示退出按钮（登录和注册页面不显示）
-const showLogoutButton = computed(() => {
+// 是否显示退出按钮（登录和注册页面不显示）
+const showButton = computed(() => {
   return isLoggedIn.value && currentRoute.value !== '/login' && currentRoute.value !== '/register'
 })
+
+// 跳转到管理员页
+const handleGoAdmin = () => {
+  router.push('/root')
+}
 
 // 组件挂载时检查登录状态
 onMounted(() => {
@@ -57,7 +63,7 @@ router.beforeEach((to, from, next) => {
     next('/login')
     return
   }
-  
+
   // 如果用户已登录且访问登录/注册页面，重定向到首页
   if (isLoggedIn.value && (to.path === '/login' || to.path === '/register')) {
     next('/home')
@@ -78,15 +84,32 @@ router.beforeEach((to, from, next) => {
           <SunIcon v-if="isDark" class="icon" />
           <MoonIcon v-else class="icon" />
         </button>
-        <button 
-          v-if="showLogoutButton" 
-          @click="handleLogout" 
-          class="logout-button"
+        <el-button
+          plain
+          type="primary"
+          size="large"
+          v-if="showButton"
+          @click="handleGoAdmin"
+          title="管理员"
+        >
+          <el-icon style="vertical-align: middle">
+            <User />
+          </el-icon>
+          管理员中心
+        </el-button>
+        <el-button
+          plain
+          type="danger"
+          size="large"
+          v-if="showButton"
+          @click="handleLogout"
           title="退出登录"
         >
-          <ArrowRightOnRectangleIcon class="icon" />
-          <span class="logout-text">退出登录</span>
-        </button>
+          <el-icon style="vertical-align: middle">
+            <SwitchButton />
+          </el-icon>
+          退出登录
+        </el-button>
       </div>
     </nav>
     <router-view v-slot="{ Component }">
@@ -157,7 +180,7 @@ body {
   .navbar-actions {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.1rem;
   }
 
   .theme-toggle {
@@ -167,6 +190,7 @@ body {
     padding: 0.5rem;
     border-radius: 50%;
     transition: background-color 0.3s;
+    margin-right: 0.75rem;
 
     &:hover {
       background: rgba(255, 255, 255, 0.1);
@@ -176,6 +200,33 @@ body {
       width: 24px;
       height: 24px;
       color: var(--text-color);
+    }
+  }
+
+  .admin-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #2563eb;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(59, 130, 246, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .admin-text {
+      @media (max-width: 768px) {
+        display: none;
+      }
     }
   }
 
@@ -225,6 +276,17 @@ body {
         border-color: rgba(220, 38, 38, 0.4);
       }
     }
+
+    .admin-button {
+      background: rgba(59, 130, 246, 0.18);
+      border-color: rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+
+      &:hover {
+        background: rgba(59, 130, 246, 0.26);
+        border-color: rgba(59, 130, 246, 0.45);
+      }
+    }
   }
 }
 
@@ -252,6 +314,9 @@ body {
       .logout-text {
         display: none;
       }
+    }
+    .admin-button {
+      padding: 0.5rem;
     }
   }
 }

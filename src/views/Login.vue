@@ -83,10 +83,14 @@
 </template>
 
 <script setup>
+defineOptions ({
+  name: 'Login'
+})
+
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDark } from '@vueuse/core'
-import { SginAPI } from '../services/user.js'
+import { SignAPI } from '../services/user.js'
 import { ElMessage } from 'element-plus'
 
 const isDark = useDark()
@@ -108,7 +112,7 @@ const handleLogin = async () => {
   isLoading.value = true
 
   try {
-    const responseJson = await SginAPI.login(loginForm.value)
+    const responseJson = await SignAPI.login(loginForm.value)
 
     if (responseJson.code === 200) {
       router.push('/home')

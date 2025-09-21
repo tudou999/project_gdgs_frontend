@@ -91,6 +91,10 @@
 </template>
 
 <script setup>
+defineOptions ({
+  name: 'AIChat'
+})
+
 import {nextTick, onMounted, ref} from 'vue'
 import {useDark} from '@vueuse/core'
 import {

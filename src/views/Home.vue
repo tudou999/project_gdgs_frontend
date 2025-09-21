@@ -21,6 +21,10 @@
 </template>
 
 <script setup>
+defineOptions({
+  name: 'Home'
+})
+
 import { ref } from 'vue'
 import { useDark } from '@vueuse/core'
 import { 

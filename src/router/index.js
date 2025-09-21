@@ -51,6 +51,11 @@ const routes = [
     path: '/register',
     name: 'Register',
     component: lazyLoad('Register')
+  },
+  {
+    path: '/root',
+    name: 'Root',
+    component: lazyLoad('Root')
   }
 ]
 
