@@ -5,7 +5,7 @@
         <h1 class="login-title">欢迎回来</h1>
         <p class="login-subtitle">请使用您的邮箱和密码登录</p>
       </div>
-      
+
       <form class="login-form" @submit.prevent="handleLogin">
         <div class="form-group">
           <label for="email" class="form-label">邮箱地址</label>
@@ -25,7 +25,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="form-group">
           <label for="password" class="form-label">密码</label>
           <div class="input-wrapper">
@@ -57,7 +57,7 @@
             </button>
           </div>
         </div>
-        
+
         <div class="form-options">
           <label class="remember-me">
             <input type="checkbox" v-model="loginForm.rememberMe" class="checkbox">
@@ -65,12 +65,12 @@
           </label>
           <a href="#" class="forgot-password">忘记密码？</a>
         </div>
-        
+
         <button type="submit" class="login-button" :disabled="isLoading">
           <span v-if="isLoading" class="loading-spinner"></span>
           <span v-else>登录</span>
         </button>
-        
+
         <div class="login-footer">
           <p class="register-text">
             还没有账号？

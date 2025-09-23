@@ -1,104 +1,75 @@
 <template>
-  <div class="user-management">
-    <div class="header">
+  <el-container class="user-management">
+    <!-- 标题 -->
+    <el-header>
       <h1>用户管理</h1>
-      <button @click="loadUsers" class="refresh-btn">刷新</button>
-    </div>
-
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading">
-      正在加载用户列表...
-    </div>
-
-    <!-- 错误信息 -->
-    <div v-if="error" class="error">
-      {{ error }}
-    </div>
+    </el-header>
 
     <!-- 用户列表 -->
-    <div v-if="!loading && !error" class="user-list">
-      <div class="table-container">
-        <table class="user-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>邮箱</th>
-              <th>用户名</th>
-              <th>角色</th>
-              <th>创建时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in users" :key="user.id" class="user-row">
-              <td>{{ user.id }}</td>
-              <td>{{ user.email }}</td>
-              <td>{{ user.username || '未设置' }}</td>
-              <td>
-                <span :class="['role-badge', user.auth === 1 ? 'admin' : 'user']">
-                  {{ user.auth === 1 ? '管理员' : '普通用户' }}
-                </span>
-              </td>
-              <td>{{ formatDate(user.createTime) }}</td>
-              <td>
-                <button
-                  v-if="showButton(user)"
-                  @click="confirmDelete(user)"
-                  class="delete-btn"
-                >
-                  删除
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <el-container>
+      <el-table
+        v-loading="loading"
+        size="large"
+        :data="users">
+          <el-table-column prop="id" label="ID" width="180" />
+          <el-table-column prop="email" label="邮箱" min-width="180" />
+          <el-table-column prop="username" label="用户名" align="center" min-width="150">
+            <template #default="scope">
+              {{ scope.row.username || '未设置' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="角色" align="center" width="100">
+            <template #default="scope">
+              <span :class="['role-badge', getRole.class(scope.row.auth)]">
+                {{ getRole.name(scope.row.auth) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" width="160" align="center">
+            <template #default="scope">
+              {{ formatDate(scope.row.createTime) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" align="center" width="90">
+            <template #default="scope">
+              <el-button
+                type="danger"
+                size="default"
+                color="#dc3545"
+                v-if="showButton(scope.row)"
+                @click="deleteUser(scope.row)">
+                删除
+              </el-button>
+            </template>
+      </el-table-column>
+      </el-table>
+    </el-container>
 
-      <!-- 分页 -->
+    <!-- 分页 -->
+    <el-pagination
+      v-if="!loading && pagination"
+      size = "large"
+      background
+      layout="prev, pager, next"
+      :total="pagination.total"
+      :page-size="pageSize"
+      :current-page="pagination.current"
+      @current-change="changePage"
+    />
 
-      <div>
-        <el-pagination
-          v-if="!loading && pagination"
-          size = "large"
-          background
-          layout="prev, pager, next"
-          :total="pagination.total"
-          :page-size="pageSize"
-          :current-page="pagination.current"
-          @current-change="changePage"
-        />
-      </div>
-    </div>
+    </el-container>
 
-    <!-- 删除确认对话框 -->
-    <div v-if="showDeleteDialog" class="dialog-overlay" @click="cancelDelete">
-      <div class="dialog" @click.stop>
-        <h3>确认删除</h3>
-        <p>确定要删除用户 "{{ selectedUser?.email }}" 吗？此操作不可撤销。</p>
-        <div class="dialog-actions">
-          <button @click="cancelDelete" class="cancel-btn">取消</button>
-          <button @click="deleteUser" class="confirm-btn">确认删除</button>
-        </div>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup>
-import {ElMessage} from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 defineOptions({
   name: 'Root'
 })
 
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useDark } from '@vueuse/core'
 import { RootAPI } from '../services/user.js'
-
-// TODO：主题切换
-const isDark = useDark()
-const router = useRouter()
 
 const users = ref([])
 const loading = ref(false)
@@ -106,8 +77,6 @@ const error = ref(null)
 const pagination = ref(null)
 const currentPage = ref(1)
 const pageSize = ref(10)
-const showDeleteDialog = ref(false)
-const selectedUser = ref(null)
 
 // 加载用户列表
 const loadUsers = async () => {
@@ -117,7 +86,7 @@ const loadUsers = async () => {
   try {
     const response = await RootAPI.getAllUsers(currentPage.value, pageSize.value)
 
-    if (response.code === 200) {
+    if (getCode(response)) {
       users.value = response.data.records || []
 
       pagination.value = {
@@ -125,7 +94,6 @@ const loadUsers = async () => {
         pages: Number(response.data.pages),
         total: Number(response.data.total)
       }
-      console.log('分页信息:', pagination.value)
 
     } else {
       error.value = response.msg
@@ -147,36 +115,43 @@ const changePage = async (page) => {
   await loadUsers()
 }
 
-// 确认删除用户
-const confirmDelete = (user) => {
-  selectedUser.value = user
-  showDeleteDialog.value = true
+// 删除用户
+// TODO：email需要改成name
+const deleteUser = (user) => {
+  ElMessageBox.confirm(
+      `确定要删除用户 ${user?.email} 吗？此操作不可撤销。`,
+      '注意！',
+      {
+        confirmButtonText: 'OK',
+        cancelButtonText: 'Cancel',
+        type: 'warning',
+      }
+  )
+      // 确认删除
+      .then(async () => {
+        if (!user) return
+
+        try {
+          const response = await RootAPI.deleteUser(user.id)
+
+          if (getCode(response)) {
+            ElMessage.success('删除成功！')
+            await loadUsers()
+          } else {
+            ElMessage.error(response.msg)
+          }
+        } catch (err) {
+          console.error('删除用户失败:', err)
+        }
+      })
+      // 取消删除
+      .catch(() => {
+      })
 }
 
-// 取消删除
-const cancelDelete = () => {
-  showDeleteDialog.value = false
-  selectedUser.value = null
-}
-
-// 执行删除用户
-const deleteUser = async () => {
-  if (!selectedUser.value) return
-
-  try {
-    const response = await RootAPI.deleteUser(selectedUser.value.id)
-
-    if (response.code === 200) {
-      showDeleteDialog.value = false
-      selectedUser.value = null
-      ElMessage.success('删除成功！')
-      await loadUsers()
-    } else {
-      ElMessage.error(response.msg)
-    }
-  } catch (err) {
-    console.error('删除用户失败:', err)
-  }
+// 是否显示删除按钮
+const showButton = (user) => {
+  return user.auth === 0
 }
 
 // 格式化日期
@@ -186,9 +161,23 @@ const formatDate = (dateString) => {
   return date.toLocaleString('zh-CN')
 }
 
-// 是否显示删除按钮
-const showButton = (user) => {
-  return user.auth === 0
+// 获得用户权限信息
+class getRole {
+  static name(auth) {
+    return auth === 1 ? '管理员' : '普通用户';
+  }
+
+  static class(auth) {
+    return auth === 1 ? 'admin' : 'user';
+  }
+}
+
+// 返回操作码
+const getCode = (response) => {
+  if (response.code === 200)
+    return true
+  else
+    return false
 }
 
 // 组件挂载时加载数据
@@ -203,76 +192,17 @@ onMounted(() => {
   max-width: 1200px;
   margin: 0 auto;
 
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-
-    h1 {
-      color: #333;
-      margin: 0;
-    }
-
-    .refresh-btn {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-
-      &:hover {
-        background: #0056b3;
-      }
-    }
-  }
-
-  .loading, .error {
+  .error {
     text-align: center;
     padding: 40px;
     font-size: 16px;
-  }
-
-  .error {
     color: #dc3545;
     background: #f8d7da;
     border: 1px solid #f5c6cb;
     border-radius: 4px;
   }
 
-  .table-container {
-    overflow-x: auto;
-    margin-bottom: 20px;
-  }
-
-  .user-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-
-    th, td {
-      padding: 12px;
-      text-align: left;
-      border-bottom: 1px solid #eee;
-    }
-
-    th {
-      background: #f8f9fa;
-      font-weight: 600;
-      color: #495057;
-    }
-
-    .user-row {
-      &:hover {
-        background: #f8f9fa;
-      }
-    }
-  }
-
+  // 用户角色标签样式
   .role-badge {
     min-width: 64px;
     display: inline-block;
@@ -293,6 +223,7 @@ onMounted(() => {
     }
   }
 
+  // 删除按钮样式
   .delete-btn {
     background: #dc3545;
     color: white;
