@@ -1,85 +1,53 @@
 <template>
-  <div class="login-container" :class="{ 'dark': isDark }">
-    <div class="login-card">
-      <div class="login-header">
+  <el-container class="login-container">
+    <el-container class="login-card">
+<!--      标题-->
+      <el-header class="login-header">
         <h1 class="login-title">欢迎回来</h1>
         <p class="login-subtitle">请使用您的邮箱和密码登录</p>
-      </div>
+      </el-header>
 
-      <form class="login-form" @submit.prevent="handleLogin">
-        <div class="form-group">
-          <label for="email" class="form-label">邮箱地址</label>
-          <div class="input-wrapper">
-            <input
-              id="email"
-              v-model="loginForm.email"
-              type="email"
-              class="form-input"
-              placeholder="请输入您的邮箱地址"
-              required
-            >
-            <div class="input-icon">
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path>
-              </svg>
-            </div>
-          </div>
-        </div>
+<!--      表单体-->
+      <el-form :model="loginForm" class="login-form" @submit.prevent="handleLogin">
 
-        <div class="form-group">
-          <label for="password" class="form-label">密码</label>
-          <div class="input-wrapper">
-            <input
-              id="password"
+        <el-form-item label="邮箱地址" label-position="top" size="large">
+          <el-input
+            v-model="loginForm.email"
+            placeholder="请输入您的邮箱地址"
+            prefix-icon="UserFilled" />
+        </el-form-item>
+
+        <el-form-item label="密码" label-position="top" size="large">
+          <el-input
               v-model="loginForm.password"
-              :type="showPassword ? 'text' : 'password'"
-              class="form-input"
               placeholder="请输入您的密码"
-              required
-            >
-            <div class="input-icon">
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-              </svg>
-            </div>
-            <button
-              type="button"
-              class="password-toggle"
-              @click="showPassword = !showPassword"
-            >
-              <svg v-if="showPassword" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-              </svg>
-              <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-              </svg>
-            </button>
-          </div>
-        </div>
+              prefix-icon="Key"
+              :type="showPassword ? 'text' : 'password'">
+            <template #suffix>
+              <el-button @click="showPassword = !showPassword" link style="border: none; box-shadow: none;">
+                <el-icon v-if="showPassword"><Hide /></el-icon>
+                <el-icon v-else><View /></el-icon>
+              </el-button>
+            </template>
+          </el-input>
+        </el-form-item>
+      </el-form>
 
-        <div class="form-options">
-          <label class="remember-me">
-            <input type="checkbox" v-model="loginForm.rememberMe" class="checkbox">
-            <span class="checkbox-text">记住我</span>
-          </label>
-          <a href="#" class="forgot-password">忘记密码？</a>
-        </div>
+<!--      登录按钮-->
+      <el-button @click="handleLogin" class="login-button" :disabled="isLoading" size="large" style="margin-top: 1.5rem;">
+        <span v-if="isLoading" class="loading-spinner"></span>
+        <span v-else>登录</span>
+      </el-button>
 
-        <button type="submit" class="login-button" :disabled="isLoading">
-          <span v-if="isLoading" class="loading-spinner"></span>
-          <span v-else>登录</span>
-        </button>
-
-        <div class="login-footer">
-          <p class="register-text">
-            还没有账号？
-            <a href="#" class="register-link" @click.prevent="gotoRegister">立即注册</a>
-          </p>
-        </div>
-      </form>
-    </div>
-  </div>
+<!--      注册按钮-->
+      <div class="login-footer">
+        <p class="register-text">
+          还没有账号？
+          <a href="#" class="register-link" @click.prevent="gotoRegister">立即注册</a>
+        </p>
+      </div>
+    </el-container>
+  </el-container>
 </template>
 
 <script setup>
@@ -89,11 +57,9 @@ defineOptions ({
 
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDark } from '@vueuse/core'
 import { SignAPI } from '../services/user.js'
 import { ElMessage } from 'element-plus'
 
-const isDark = useDark()
 const router = useRouter()
 
 const loginForm = ref({
@@ -116,9 +82,7 @@ const handleLogin = async () => {
 
     if (responseJson.code === 200) {
       router.push('/home')
-
       ElMessage.success('登录成功！')
-
       localStorage.setItem('token', responseJson.data.token)
     }
     else {
@@ -154,7 +118,6 @@ const gotoRegister = () => {
   .login-card {
     width: 100%;
     max-width: 420px;
-    background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
     border-radius: 1.5rem;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
@@ -293,144 +256,68 @@ const gotoRegister = () => {
         }
       }
     }
-
-    .login-button {
-      width: 100%;
-      padding: 1rem;
-      background: linear-gradient(135deg, #007CF0, #00D4FF);
-      color: white;
-      border: none;
-      border-radius: 0.75rem;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      position: relative;
-      overflow: hidden;
-
-      &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0, 124, 240, 0.3);
-      }
-
-      &:active:not(:disabled) {
-        transform: translateY(0);
-      }
-
-      &:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-        transform: none;
-      }
-
-      .loading-spinner {
-        display: inline-block;
-        width: 1.25rem;
-        height: 1.25rem;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-radius: 50%;
-        border-top-color: white;
-        animation: spin 1s ease-in-out infinite;
-      }
-    }
-
-    .login-footer {
-      text-align: center;
-      margin-top: 2rem;
-
-      .register-text {
-        font-size: 0.875rem;
-        color: #666;
-        margin: 0;
-
-        .register-link {
-          color: #007CF0;
-          text-decoration: none;
-          font-weight: 600;
-          transition: color 0.2s ease;
-
-          &:hover {
-            color: #0066cc;
-          }
-        }
-      }
-    }
-  }
-}
-
-.dark {
-  .login-card {
-    background: rgba(40, 40, 40, 0.95);
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   }
 
-  .login-header {
-    .login-title {
-      color: #fff;
+  .login-button {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #007CF0, #00D4FF);
+    color: white;
+    border: none;
+    border-radius: 0.75rem;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(0, 124, 240, 0.3);
     }
 
-    .login-subtitle {
-      color: #9ca3af;
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
     }
   }
 
-  .login-form {
-    .form-group {
-      .form-label {
-        color: #e5e7eb;
-      }
+  .login-footer {
+    text-align: center;
+    margin-top: 2rem;
 
-      .input-wrapper {
-        .form-input {
-          background: rgba(255, 255, 255, 0.05);
-          border-color: rgba(255, 255, 255, 0.1);
-          color: #fff;
+    .register-text {
+      font-size: 0.875rem;
+      color: #666;
+      margin: 0;
 
-          &:focus {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: #007CF0;
-            box-shadow: 0 0 0 3px rgba(0, 124, 240, 0.2);
-          }
+      .register-link {
+        color: #007CF0;
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.2s ease;
 
-          &::placeholder {
-            color: #6b7280;
-          }
-        }
-
-        .input-icon {
-          color: #6b7280;
-        }
-
-        .password-toggle {
-          color: #6b7280;
-
-          &:hover {
-            color: #007CF0;
-          }
+        &:hover {
+          color: #0066cc;
         }
       }
     }
-
-    .form-options {
-      .remember-me {
-        .checkbox-text {
-          color: #e5e7eb;
-        }
-      }
-    }
-
-    .login-footer {
-      .register-text {
-        color: #9ca3af;
-      }
-    }
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 
