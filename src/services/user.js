@@ -1,9 +1,9 @@
-const BASE_URL = 'http://localhost'
+const USER_BASE_URL = 'http://localhost/api/v1/user'
 
 export const SignAPI = {
 
   async login(loginFormValue) {
-    const response = await fetch(`${BASE_URL}/api/v1/user/login`, {
+    const response = await fetch(`${USER_BASE_URL}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -18,7 +18,7 @@ export const SignAPI = {
   },
 
   async register(registerFormValue) {
-    const response = await fetch(`${BASE_URL}/api/v1/user/register`, {
+    const response = await fetch(`${USER_BASE_URL}/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -43,7 +43,14 @@ export const RootAPI = {
   // 获取所有用户列表（管理员接口）
   async getAllUsers(pageNum, pageSize) {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}/api/v1/user/admin?pageNum=${pageNum}&pageSize=${pageSize}`, {
+
+    // 构建查询参数
+    const params = new URLSearchParams({
+      pageNum: pageNum,
+      pageSize: pageSize
+    });
+
+    const response = await fetch(`${USER_BASE_URL}/admin?${params}`, {
       method: 'GET',
       headers: {
         'Authorization': token,
@@ -61,7 +68,7 @@ export const RootAPI = {
   // 删除用户（管理员接口）
   async deleteUser(userId) {
     const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}/api/v1/user/admin/${userId}`, {
+    const response = await fetch(`${USER_BASE_URL}/admin/${userId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': token,
