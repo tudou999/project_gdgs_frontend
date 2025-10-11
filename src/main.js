@@ -9,14 +9,15 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 
 // 创建应用
-const app = createApp(App)
 const pinia = createPinia()
+const app = createApp(App)
 
 // 使用路由器和Element Plus
 app.use(router)
 app.use(ElementPlus, { size: 'small', zIndex: 3000 }) // 全局配置
-app.mount('#app')
 app.use(pinia)
+app.mount('#app')
+
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }

@@ -2,13 +2,15 @@
 import { RouterLink, RouterView } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
 import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
-import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
-import {User, SwitchButton} from "@element-plus/icons-vue";
+import { User, SwitchButton } from "@element-plus/icons-vue";
+import { useUserStore } from '@/stores/user'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const router = useRouter()
+const userStore = useUserStore()
 
 // 添加全局状态来跟踪当前路由
 const currentRoute = ref(router.currentRoute.value.path)
@@ -23,9 +25,9 @@ const checkLoginStatus = () => {
   isLoggedIn.value = !!token
 }
 
-// 退出登录（清除缓存中的token）
+// 退出登录
 const handleLogout = () => {
-  localStorage.removeItem('token')
+  userStore.clearToken()
   isLoggedIn.value = false
   // 重定向到登录页面
   router.push('/login')
@@ -53,10 +55,10 @@ router.beforeEach((to, from, next) => {
     // 触发一个自定义事件，让 ChatPDF 组件知道要清理资源
     window.dispatchEvent(new CustomEvent('cleanupChatPDF'))
   }
-  
+
   // 检查登录状态
   checkLoginStatus()
-  
+
   // 如果用户未登录且访问需要登录的页面，重定向到登录页
   const publicRoutes = ['/login', '/register']
   if (!isLoggedIn.value && !publicRoutes.includes(to.path)) {
@@ -69,7 +71,7 @@ router.beforeEach((to, from, next) => {
     next('/home')
     return
   }
-  
+
   currentRoute.value = to.path
   next()
 })
@@ -310,7 +312,7 @@ body {
 
     .logout-button {
       padding: 0.5rem;
-      
+
       .logout-text {
         display: none;
       }
