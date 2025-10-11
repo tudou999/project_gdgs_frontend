@@ -5,7 +5,7 @@ import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/
 import { useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
 import { User, SwitchButton } from "@element-plus/icons-vue";
-import { useUserStore } from '@/stores/user'
+import { useUserStore } from './stores/user'
 
 const isDark = useDark()
 const toggleDark = useToggle(isDark)

@@ -46,7 +46,7 @@
     </el-container>
 
     <!-- 分页 -->
-    <el-pagination
+    <el-pagination class="pagination-wrapper"
       v-if="!loading && pagination"
       size = "large"
       background
@@ -174,10 +174,7 @@ class getRole {
 
 // 返回操作码
 const getCode = (response) => {
-  if (response.code === 200)
-    return true
-  else
-    return false
+  return response.code === 200;
 }
 
 // 组件挂载时加载数据
@@ -241,6 +238,12 @@ onMounted(() => {
       background: #6c757d;
       cursor: not-allowed;
     }
+  }
+
+  .pagination-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
   }
 
   .dialog-overlay {

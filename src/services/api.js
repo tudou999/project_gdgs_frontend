@@ -1,7 +1,8 @@
-const BASE_URL = 'http://localhost'
-
-const token = localStorage.getItem('token')
+import { useUserStore } from '../stores/user'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+
+const BASE_URL = 'http://localhost'
+const userStore = useUserStore()
 
 export const chatAPI = {
 
@@ -32,7 +33,7 @@ export const chatAPI = {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
-          'Authorization': token
+          'Authorization': userStore.token
         },
         body: JSON.stringify({ message }),
 
@@ -114,7 +115,7 @@ export const chatAPI = {
       const response = await fetch(`${BASE_URL}/api/v1/session`, {
           method: 'GET',
           headers: {
-              'Authorization': token
+              'Authorization': userStore.token
           }
       });
 
@@ -136,7 +137,7 @@ export const chatAPI = {
       const response = await fetch(`${BASE_URL}/api/v1/message/session/${chatId}`, {
           method: 'GET',
           headers: {
-              'Authorization': token
+              'Authorization': userStore.token
           }
       });
       if (!response.ok) {

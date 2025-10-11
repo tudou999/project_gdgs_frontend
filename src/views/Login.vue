@@ -59,8 +59,11 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { SignAPI } from '../services/user.js'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '../stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+
 
 const loginForm = ref({
   email: '',
@@ -81,9 +84,10 @@ const handleLogin = async () => {
     const responseJson = await SignAPI.login(loginForm.value)
 
     if (responseJson.code === 200) {
-      router.push('/home')
+      // 使用replace避免重复登录
+      router.replace('/home')
       ElMessage.success('登录成功！')
-      localStorage.setItem('token', responseJson.data.token)
+      userStore.setToken(responseJson.data.token)
     }
     else {
       ElMessage.error(responseJson.msg)

@@ -1,3 +1,6 @@
+import { useUserStore } from '../stores/user'
+
+const userStore = useUserStore()
 const USER_BASE_URL = 'http://localhost/api/v1/user'
 
 export const SignAPI = {
@@ -42,7 +45,6 @@ export const RootAPI = {
   
   // 获取所有用户列表（管理员接口）
   async getAllUsers(pageNum, pageSize) {
-    const token = localStorage.getItem('token');
 
     // 构建查询参数
     const params = new URLSearchParams({
@@ -50,10 +52,11 @@ export const RootAPI = {
       pageSize: pageSize
     });
 
-    const response = await fetch(`${USER_BASE_URL}/admin?${params}`, {
+      // 使用query传参
+      const response = await fetch(`${USER_BASE_URL}/admin?${params}`, {
       method: 'GET',
       headers: {
-        'Authorization': token,
+        'Authorization': userStore.token,
         'Content-Type': 'application/json'
       }
     });
@@ -66,12 +69,12 @@ export const RootAPI = {
   },
 
   // 删除用户（管理员接口）
+  // 使用路由传参
   async deleteUser(userId) {
-    const token = localStorage.getItem('token');
     const response = await fetch(`${USER_BASE_URL}/admin/${userId}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': token,
+        'Authorization': userStore.token,
         'Content-Type': 'application/json'
       }
     });
