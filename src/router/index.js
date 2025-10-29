@@ -56,6 +56,11 @@ const routes = [
     path: '/root',
     name: 'Root',
     component: lazyLoad('Root')
+  },
+  {
+    path: '/file',
+    name: 'FileController',
+    component: lazyLoad('FileController')
   }
 ]
 

@@ -18,6 +18,7 @@
     "@vueuse/components": "^12.7.0",
     "@vueuse/core": "^12.7.0",
     "ai-hub": "file:",
+    "axios": "^1.13.0",
     "dompurify": "^3.2.4",
     "element-plus": "^2.11.2",
     "fs-extra": "^11.2.0",

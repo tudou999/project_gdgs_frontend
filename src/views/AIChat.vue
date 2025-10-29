@@ -1,7 +1,9 @@
 <template>
-  <div class="ai-chat" :class="{ 'dark': isDark }">
-    <div class="chat-container">
-      <div class="sidebar">
+  <el-container class="ai-chat">
+    <el-container class="chat-container">
+
+<!--      侧边栏-->
+      <el-aside class="sidebar">
         <div class="history-header">
           <h2>聊天记录</h2>
           <button class="new-chat" @click="startNewChat">
@@ -21,9 +23,10 @@
             <span class="title">{{ chat.title || '新对话' }}</span>
           </div>
         </div>
-      </div>
-      
-      <div class="chat-main">
+      </el-aside>
+
+<!--      主区域-->
+      <el-main class="chat-main">
         <div class="messages" ref="messagesRef">
           <ChatMessage
             v-for="(message, index) in currentMessages"
@@ -35,7 +38,6 @@
             :is-stream="isStreaming && index === currentMessages.length - 1"
           />
         </div>
-        
         <div class="input-area">
           <div v-if="selectedFiles.length > 0" class="selected-files">
             <div v-for="(file, index) in selectedFiles" :key="index" class="file-item">
@@ -85,9 +87,10 @@
             </button>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
+      </el-main>
+
+    </el-container>
+  </el-container>
 </template>
 
 <script setup>
@@ -119,6 +122,122 @@ const chatHistory = ref([])
 const fileInput = ref(null)
 const selectedFiles = ref([])
 
+// 开始新对话
+const startNewChat = () => {
+  const newChatId = Date.now().toString()
+  currentChatId.value = newChatId
+  currentMessages.value = []
+
+  // 添加新对话到聊天历史列表
+  const newChat = {
+    id: newChatId,
+    title: `对话 ${newChatId.slice(-6)}`
+  }
+  chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
+}
+
+// 加载聊天历史
+const loadChatHistory = async () => {
+  try {
+    const history = await chatAPI.getChatHistory()
+    chatHistory.value = history || []
+    if (history && history.length > 0) {
+      await loadChat(history[0].id)
+    } else {
+      startNewChat()
+    }
+  } catch (error) {
+    console.error('加载聊天历史失败:', error)
+    chatHistory.value = []
+    startNewChat()
+  }
+}
+
+// 加载特定对话
+const loadChat = async (chatId) => {
+  currentChatId.value = chatId
+  try {
+    currentMessages.value = await chatAPI.getChatMessages(chatId)
+    await scrollToBottom()
+  } catch (error) {
+    console.error('加载对话消息失败:', error)
+    currentMessages.value = []
+  }
+}
+
+// 修改发送消息函数
+const sendMessage = async () => {
+  if (isStreaming.value) return
+  if (!userInput.value.trim() && !selectedFiles.value.length) return
+
+  const messageContent = userInput.value.trim()
+
+  // 添加用户消息
+  const userMessage = {
+    senderType: 0,
+    contents: messageContent,
+    timestamp: new Date()
+  }
+  currentMessages.value.push(userMessage)
+
+  // 清空输入
+  userInput.value = ''
+  adjustTextareaHeight()
+  await scrollToBottom()
+
+  // 准备发送数据
+  const formData = new FormData()
+  if (messageContent) {
+    formData.append('prompt', messageContent)
+  }
+  selectedFiles.value.forEach(file => {
+    formData.append('files', file)
+  })
+
+  // 添加助手消息占位
+  const assistantMessage = {
+    senderType: 1,
+    contents: '',
+    timestamp: new Date()
+  }
+  currentMessages.value.push(assistantMessage)
+
+  console .log('发送数据:', currentMessages)
+  isStreaming.value = true
+
+  // 监听流式数据事件
+  const handleStreamData = (event) => {
+    const { data } = event.detail
+    assistantMessage.contents += data
+
+    // 更新消息内容
+    const lastIndex = currentMessages.value.length - 1
+    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
+    scrollToBottom()
+  }
+
+  // 添加事件监听器
+  window.addEventListener('streamData', handleStreamData)
+
+  try {
+    await chatAPI.sendMessage(formData, currentChatId.value)
+  } catch (error) {
+    console.error('发送消息失败:', error)
+    assistantMessage.content = '抱歉，发生了错误，请稍后重试。'
+    const lastIndex = currentMessages.value.length - 1
+    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
+  } finally {
+    isStreaming.value = false
+    selectedFiles.value = [] // 清空已选文件
+    fileInput.value.value = '' // 清空文件输入
+
+    // 移除事件监听器
+    window.removeEventListener('streamData', handleStreamData)
+
+    await scrollToBottom()
+  }
+}
+
 // 自动调整输入框高度
 const adjustTextareaHeight = () => {
   const textarea = inputRef.value
@@ -127,14 +246,6 @@ const adjustTextareaHeight = () => {
     textarea.style.height = textarea.scrollHeight + 'px'
   }else{
     textarea.style.height = '50px'
-  }
-}
-
-// 滚动到底部
-const scrollToBottom = async () => {
-  await nextTick()
-  if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
   }
 }
 
@@ -263,123 +374,6 @@ const getPlaceholder = () => {
   return '输入消息，可上传图片、音频或视频...'
 }
 
-// 修改发送消息函数
-const sendMessage = async () => {
-  if (isStreaming.value) return
-  if (!userInput.value.trim() && !selectedFiles.value.length) return
-
-  const messageContent = userInput.value.trim()
-
-  // 添加用户消息
-  const userMessage = {
-    senderType: 0,
-    contents: messageContent,
-    timestamp: new Date()
-  }
-  currentMessages.value.push(userMessage)
-
-  // 清空输入
-  userInput.value = ''
-  adjustTextareaHeight()
-  await scrollToBottom()
-
-  // 准备发送数据
-  const formData = new FormData()
-  if (messageContent) {
-    formData.append('prompt', messageContent)
-  }
-  selectedFiles.value.forEach(file => {
-    formData.append('files', file)
-  })
-
-  // 添加助手消息占位
-  const assistantMessage = {
-    senderType: 1,
-    contents: '',
-    timestamp: new Date()
-  }
-  currentMessages.value.push(assistantMessage)
-
-  console .log('发送数据:', currentMessages)
-  isStreaming.value = true
-
-  // 监听流式数据事件
-  const handleStreamData = (event) => {
-    const { data } = event.detail
-    assistantMessage.contents += data
-
-    // 更新消息内容
-    const lastIndex = currentMessages.value.length - 1
-    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
-    scrollToBottom()
-  }
-
-  // 添加事件监听器
-  window.addEventListener('streamData', handleStreamData)
-
-  try {
-    await chatAPI.sendMessage(formData, currentChatId.value)
-  } catch (error) {
-    console.error('发送消息失败:', error)
-    assistantMessage.content = '抱歉，发生了错误，请稍后重试。'
-    const lastIndex = currentMessages.value.length - 1
-    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
-  } finally {
-    isStreaming.value = false
-    selectedFiles.value = [] // 清空已选文件
-    fileInput.value.value = '' // 清空文件输入
-
-    // 移除事件监听器
-    window.removeEventListener('streamData', handleStreamData)
-
-    await scrollToBottom()
-  }
-}
-
-// 加载特定对话
-const loadChat = async (chatId) => {
-  currentChatId.value = chatId
-  try {
-    currentMessages.value = await chatAPI.getChatMessages(chatId)
-    console.log('加载对话消息成功:', currentMessages)
-    await scrollToBottom()
-  } catch (error) {
-    console.error('加载对话消息失败:', error)
-    currentMessages.value = []
-  }
-}
-
-// 加载聊天历史
-const loadChatHistory = async () => {
-  try {
-    const history = await chatAPI.getChatHistory()
-    chatHistory.value = history || []
-    if (history && history.length > 0) {
-      await loadChat(history[0].id)
-    } else {
-      startNewChat()
-    }
-  } catch (error) {
-    console.error('加载聊天历史失败:', error)
-    chatHistory.value = []
-    startNewChat()
-  }
-}
-
-// 开始新对话
-const startNewChat = () => {
-  const newChatId = Date.now().toString()
-  currentChatId.value = newChatId
-  currentMessages.value = []
-  
-  // 添加新对话到聊天历史列表
-  const newChat = {
-    id: newChatId,
-    title: `对话 ${newChatId.slice(-6)}`
-  }
-  chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
-}
-
 // 格式化文件大小
 const formatFileSize = (bytes) => {
   if (bytes < 1024) return bytes + ' B'
@@ -392,6 +386,14 @@ const removeFile = (index) => {
   selectedFiles.value = selectedFiles.value.filter((_, i) => i !== index)
   if (selectedFiles.value.length === 0) {
     fileInput.value.value = ''  // 清空文件输入
+  }
+}
+
+// 滚动到底部
+const scrollToBottom = async () => {
+  await nextTick()
+  if (messagesRef.value) {
+    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
   }
 }
 
@@ -701,117 +703,117 @@ onMounted(() => {
   }
 }
 
-.dark {
-  .sidebar {
-    background: rgba(40, 40, 40, 0.95);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-  }
-  
-  .chat-main {
-    background: rgba(40, 40, 40, 0.95);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    
-    .input-area {
-      background: rgba(30, 30, 30, 0.98);
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      
-      .selected-files {
-        background: rgba(255, 255, 255, 0.02);
-        border-color: rgba(255, 255, 255, 0.05);
-        
-        .file-item {
-          background: rgba(255, 255, 255, 0.02);
-          border-color: rgba(255, 255, 255, 0.05);
-          
-          &:hover {
-            background: rgba(0, 124, 240, 0.1);
-            border-color: rgba(0, 124, 240, 0.3);
-          }
-          
-          .file-info {
-            .icon {
-              color: #007CF0;
-            }
-            
-            .file-name {
-              color: #fff;
-            }
-            
-            .file-size {
-              color: #999;
-              background: rgba(255, 255, 255, 0.1);
-            }
-          }
-          
-          .remove-btn {
-            background: rgba(255, 255, 255, 0.1);
-            color: #999;
-            
-            &:hover {
-              background: #ff4d4f;
-              color: #fff;
-            }
-          }
-        }
-      }
-
-      .input-row {
-        background: rgba(255, 255, 255, 0.02);
-        border-color: rgba(255, 255, 255, 0.05);
-        box-shadow: none;
-
-        textarea {
-          color: #fff;
-          
-          &::placeholder {
-            color: #666;
-          }
-        }
-
-        .file-upload .upload-btn {
-          background: rgba(0, 124, 240, 0.2);
-          color: #007CF0;
-          
-          &:hover:not(:disabled) {
-            background: rgba(0, 124, 240, 0.3);
-          }
-        }
-      }
-    }
-  }
-  
-  .history-item {
-    &:hover {
-      background: rgba(255, 255, 255, 0.05) !important;
-    }
-    
-    &.active {
-      background: rgba(0, 124, 240, 0.2) !important;
-    }
-  }
-  
-  textarea {
-    background: rgba(255, 255, 255, 0.05) !important;
-    
-    &:focus {
-      background: rgba(255, 255, 255, 0.1) !important;
-    }
-  }
-
-  .input-area {
-    .file-upload {
-      .upload-btn {
-        background: rgba(255, 255, 255, 0.1);
-        color: #999;
-        
-        &:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.2);
-          color: #fff;
-        }
-      }
-    }
-  }
-}
+//.dark {
+//  .sidebar {
+//    background: rgba(40, 40, 40, 0.95);
+//    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+//  }
+//
+//  .chat-main {
+//    background: rgba(40, 40, 40, 0.95);
+//    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+//
+//    .input-area {
+//      background: rgba(30, 30, 30, 0.98);
+//      border-top: 1px solid rgba(255, 255, 255, 0.05);
+//
+//      .selected-files {
+//        background: rgba(255, 255, 255, 0.02);
+//        border-color: rgba(255, 255, 255, 0.05);
+//
+//        .file-item {
+//          background: rgba(255, 255, 255, 0.02);
+//          border-color: rgba(255, 255, 255, 0.05);
+//
+//          &:hover {
+//            background: rgba(0, 124, 240, 0.1);
+//            border-color: rgba(0, 124, 240, 0.3);
+//          }
+//
+//          .file-info {
+//            .icon {
+//              color: #007CF0;
+//            }
+//
+//            .file-name {
+//              color: #fff;
+//            }
+//
+//            .file-size {
+//              color: #999;
+//              background: rgba(255, 255, 255, 0.1);
+//            }
+//          }
+//
+//          .remove-btn {
+//            background: rgba(255, 255, 255, 0.1);
+//            color: #999;
+//
+//            &:hover {
+//              background: #ff4d4f;
+//              color: #fff;
+//            }
+//          }
+//        }
+//      }
+//
+//      .input-row {
+//        background: rgba(255, 255, 255, 0.02);
+//        border-color: rgba(255, 255, 255, 0.05);
+//        box-shadow: none;
+//
+//        textarea {
+//          color: #fff;
+//
+//          &::placeholder {
+//            color: #666;
+//          }
+//        }
+//
+//        .file-upload .upload-btn {
+//          background: rgba(0, 124, 240, 0.2);
+//          color: #007CF0;
+//
+//          &:hover:not(:disabled) {
+//            background: rgba(0, 124, 240, 0.3);
+//          }
+//        }
+//      }
+//    }
+//  }
+//
+//  .history-item {
+//    &:hover {
+//      background: rgba(255, 255, 255, 0.05) !important;
+//    }
+//
+//    &.active {
+//      background: rgba(0, 124, 240, 0.2) !important;
+//    }
+//  }
+//
+//  textarea {
+//    background: rgba(255, 255, 255, 0.05) !important;
+//
+//    &:focus {
+//      background: rgba(255, 255, 255, 0.1) !important;
+//    }
+//  }
+//
+//  .input-area {
+//    .file-upload {
+//      .upload-btn {
+//        background: rgba(255, 255, 255, 0.1);
+//        color: #999;
+//
+//        &:hover:not(:disabled) {
+//          background: rgba(255, 255, 255, 0.2);
+//          color: #fff;
+//        }
+//      }
+//    }
+//  }
+//}
 
 @media (max-width: 768px) {
   .ai-chat {
