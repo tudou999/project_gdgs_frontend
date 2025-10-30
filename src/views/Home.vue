@@ -29,8 +29,6 @@ import { ref } from 'vue'
 import { useDark } from '@vueuse/core'
 import { 
   ChatBubbleLeftRightIcon,
-  HeartIcon,
-  UserGroupIcon,
   DocumentTextIcon
 } from '@heroicons/vue/24/outline'
 
@@ -44,26 +42,11 @@ const aiApps = ref([
     route: '/ai-chat',
     icon: ChatBubbleLeftRightIcon
   },
-  // {
-  //   id: 2,
-  //   title: '哄哄模拟器',
-  //   description: '一个帮助你练习哄女朋友开心的小游戏',
-  //   route: '/game',
-  //   icon: HeartIcon,
-  //   iconClass: 'heart-icon'
-  // },
-  // {
-  //   id: 3,
-  //   title: '黑马智能客服',
-  //   description: '24小时在线的智能课程咨询师',
-  //   route: '/customer-service',
-  //   icon: UserGroupIcon
-  // },
   {
-    id: 4,
-    title: '知识库更新',
+    id: 2,
+    title: '文件系统',
     description: '更新和管理知识库文档',
-    route: '/chat-pdf',
+    route: '/file',
     icon: DocumentTextIcon
   }
 ])
