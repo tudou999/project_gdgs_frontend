@@ -1,64 +1,85 @@
 <script setup>
 import { ElMessage } from "element-plus";
 import { ArrowRight } from '@element-plus/icons-vue'
-
-defineOptions({name: "Test3"})
-
-import { onMounted, ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { fileAPI } from "../services/file";
 import { useRoute, useRouter } from 'vue-router';
 
-// 路由实例
+defineOptions({ name: "FileController" })
+
 const route = useRoute()
 const router = useRouter()
-// 文件列表
+
 const fileList = ref([])
-// 面包屑路径栈
-const breadcrumbTrail = ref([
-  { id: null, name: '全部文件' }
-])
+const breadcrumbTrail = ref([{ id: null, name: '全部文件' }])
 
-const loadFileList = async () => {
-  try {
-    const oriFileList = await fileAPI.getFileList()
-    fileList.value = oriFileList || []
+// 当前路径的 ID 数组（从根到当前文件夹）
+const currentPathIds = computed(() => {
+  const idStr = route.query.id
+  if (typeof idStr === 'string' && idStr) {
+    return idStr.split(',').map(id => id.trim()).filter(Boolean)
   }
-  catch (error){
+  return []
+})
+
+// 当前文件夹的 ID
+const currentFolderId = computed(() => {
+  return currentPathIds.value.length > 0
+      ? currentPathIds.value[currentPathIds.value.length - 1]
+      : null
+})
+
+// 加载面包屑和文件列表
+const loadContent = async () => {
+  try {
+    if (currentFolderId.value === null) {
+      fileList.value = await fileAPI.getFileList()
+    } else {
+      fileList.value = await fileAPI.getFolderList(currentFolderId.value)
+    }
+
+    const trail = [{ id: null, name: '全部文件' }]
+    for (const id of currentPathIds.value) {
+      const info = await fileAPI.getInformation(id)
+      trail.push({ id, name: info.name })
+    }
+    breadcrumbTrail.value = trail
+  } catch (error) {
+    console.error('加载失败:', error)
     ElMessage.warning('加载失败！请联系管理员')
+    await router.replace({ path: '/file' })
   }
 }
 
-// 将文件夹id推入路由
-const pushId = async(id) => {
-  try {
-    await router.push({path: '/file', query: {id}})
-  }
-  catch (error){
-    ElMessage.warning('加载失败！请联系管理员')
-  }
-}
+// 监听路由变化（包括前进/后退/初始加载）
+watch(
+    () => route.query.id,
+    () => loadContent(),
+    { immediate: true }
+)
 
-// 监听id变化（用于浏览器前进后退）
-watch(() => route.query.id, async (newId) => {
-  if (newId == null || newId === '') {
-    await loadFileList()
-    breadcrumbTrail.value = [{ id: null, name: '全部文件' }]
+const pushId = async (id) => {
+  if (id == null) {
+    await router.push({ path: '/file' })
   } else {
-    const info = await fileAPI.getInformation(newId)
-    const newFileList = await fileAPI.getFolderList(newId)
-    fileList.value = newFileList || []
-    breadcrumbTrail.value.push({ id: newId, name: info.name })
+    const newPath = [...currentPathIds.value, id]
+    await router.push({ path: '/file', query: { id: newPath.join(',') } })
   }
-}, { immediate: true })
-
-// 点击面包屑导航
-const navigateToTrail = async (index) => {
-  // 保留从 0 到 index 的路径
-  breadcrumbTrail.value = breadcrumbTrail.value.slice(0, index + 1)
-  const target = breadcrumbTrail.value[index]
-  await pushId(target.id)
 }
 
+const navigateToTrail = async (index) => {
+  if (index === 0) {
+    await router.push({ path: '/file' })
+  } else {
+    // 取前 index 个 ID（因为 breadcrumbTrail[0] 是根，对应空路径）
+    const targetPath = currentPathIds.value.slice(0, index)
+    const idStr = targetPath.length ? targetPath.join(',') : undefined
+    await router.push({
+      path: '/file',
+      query: idStr ? { id: idStr } : {}
+    })
+  }
+}
 </script>
 
 <template>
@@ -68,24 +89,29 @@ const navigateToTrail = async (index) => {
       <el-breadcrumb :separator-icon="ArrowRight">
         <el-breadcrumb-item
             v-for="(item, index) in breadcrumbTrail"
-            :key="item.id"
+            :key="`${item.id}-${index}`"
+            :to="undefined"
             @click="navigateToTrail(index)"
         >
           {{ item.name }}
         </el-breadcrumb-item>
       </el-breadcrumb>
+
       <div
-        v-for="file in fileList"
-        :key="file.id"
-        class="file-item"
+          v-for="file in fileList"
+          :key="file.id"
+          class="file-item"
       >
-        <button
+        <div
             v-if="file.folder"
-            class="folder-button"
-            @click="pushId(file.id, file.name)"
+            class="folder-link file-name"
+            role="button"
+            tabindex="0"
+            @click="pushId(file.id)"
+            @keydown.enter="pushId(file.id)"
         >
           {{ file.name || '新对话' }}
-        </button>
+        </div>
         <span v-else class="file-name">
           {{ file.name || '新对话' }}
         </span>
@@ -95,6 +121,7 @@ const navigateToTrail = async (index) => {
 </template>
 
 <style scoped lang="scss">
+/* 你的样式保持不变 */
 .file-item {
   padding: 10px 16px;
   margin-bottom: 8px;
@@ -106,24 +133,21 @@ const navigateToTrail = async (index) => {
 }
 
 .file-item:hover {
-  background-color: #e6f0ff;
+  background-color: #a9c8ff;
 }
 
-// 面包屑容器样式
 .el-breadcrumb {
   padding: 16px 24px;
   background-color: #f9fafb;
   border-bottom: 1px solid #e4e7ed;
   margin-bottom: 20px;
 
-  // 面包屑项
   .el-breadcrumb__item {
     .el-breadcrumb__inner {
       color: #606266;
       font-size: 14px;
       transition: color 0.2s ease;
 
-      // 可点击项（除了最后一项）显示为链接样式
       &:not(.is-disabled) {
         cursor: pointer;
         color: #409eff;
@@ -134,7 +158,6 @@ const navigateToTrail = async (index) => {
         }
       }
 
-      // 最后一项（当前页面）为普通文本，不可点击
       &.is-disabled {
         cursor: default;
         color: #909399;
@@ -142,7 +165,6 @@ const navigateToTrail = async (index) => {
       }
     }
 
-    // 分隔符图标样式（可选微调）
     .el-breadcrumb__separator {
       color: #c0c4cc;
       margin: 0 8px;
