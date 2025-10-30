@@ -1,10 +1,9 @@
 <script setup>
 import { ElMessage } from "element-plus";
-import { ArrowRight } from '@element-plus/icons-vue'
+import { ArrowRight, FolderAdd } from '@element-plus/icons-vue'
 import { ref, watch, computed } from "vue";
 import { fileAPI } from "../services/file";
 import { useRoute, useRouter } from 'vue-router';
-
 defineOptions({ name: "FileController" })
 
 const route = useRoute()
@@ -12,14 +11,6 @@ const router = useRouter()
 
 const fileList = ref([])
 const breadcrumbTrail = ref([{ id: null, name: '全部文件' }])
-
-// 监听路由变化（包括前进/后退/初始加载）
-watch(
-    () => route.query.id,
-    () => loadContent(),
-    { immediate: true }
-)
-
 
 // 当前路径的 ID 数组（从根到当前文件夹）
 const currentPathIds = computed(() => {
@@ -37,14 +28,17 @@ const currentFolderId = computed(() => {
       : null
 })
 
+// 监听路由变化（包括前进/后退/初始加载）
+watch(
+    () => route.query.id,
+    () => loadContent(),
+    { immediate: true }
+)
+
 // 加载面包屑和文件列表
-const loadContent = async () => {
+async function loadContent() {
   try {
-    if (currentFolderId.value === null) {
-      fileList.value = await fileAPI.getFileList()
-    } else {
-      fileList.value = await fileAPI.getFolderList(currentFolderId.value)
-    }
+    fileList.value = await fileAPI.getFolderList(currentFolderId.value)
 
     const trail = [{ id: null, name: '全部文件' }]
     for (const id of currentPathIds.value) {
@@ -60,7 +54,7 @@ const loadContent = async () => {
 }
 
 // 点击文件夹时
-const pushId = async (id) => {
+async function pushId(id) {
   if (id == null) {
     await router.push({ path: '/file' })
   } else {
@@ -70,7 +64,7 @@ const pushId = async (id) => {
 }
 
 // 点击面包屑时
-const navigateToTrail = async (index) => {
+async function navigateToTrail(index) {
   if (index === 0) {
     await router.push({ path: '/file' })
   } else {
@@ -83,22 +77,39 @@ const navigateToTrail = async (index) => {
     })
   }
 }
+
+async function newFolder() {
+  const parentId = currentFolderId.value
+  await fileAPI.createFolder(parentId, '新建文件夹')
+  fileList.value = await fileAPI.getFolderList(currentFolderId.value)
+}
 </script>
 
 <template>
   <el-container>
     <el-main>
-      <!-- 面包屑 -->
-      <el-breadcrumb :separator-icon="ArrowRight">
-        <el-breadcrumb-item
-            v-for="(item, index) in breadcrumbTrail"
-            :key="`${item.id}-${index}`"
-            :to="undefined"
-            @click="navigateToTrail(index)"
+      <div class="header-section">
+        <!-- 面包屑 -->
+        <el-breadcrumb style="margin: 0" :separator-icon="ArrowRight">
+          <el-breadcrumb-item
+              v-for="(item, index) in breadcrumbTrail"
+              :key="`${item.id}-${index}`"
+              :to="undefined"
+              @click="navigateToTrail(index)"
+          >
+            {{ item.name }}
+          </el-breadcrumb-item>
+        </el-breadcrumb>
+        <el-button
+          type="primary"
+          size="large"
+          class="createFolder-button"
+          @click="newFolder()"
         >
-          {{ item.name }}
-        </el-breadcrumb-item>
-      </el-breadcrumb>
+          <el-icon><FolderAdd /></el-icon>
+          <span>新建文件夹</span>
+        </el-button>
+      </div>
 
       <div
           v-for="file in fileList"
@@ -124,7 +135,6 @@ const navigateToTrail = async (index) => {
 </template>
 
 <style scoped lang="scss">
-/* 你的样式保持不变 */
 .file-item {
   padding: 10px 16px;
   margin-bottom: 8px;
@@ -173,5 +183,17 @@ const navigateToTrail = async (index) => {
       margin: 0 8px;
     }
   }
+}
+
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  background-color: #f9fafb;
+}
+
+.createFolder-button {
+  margin-right: 16px;
 }
 </style>

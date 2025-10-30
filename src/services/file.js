@@ -5,21 +5,12 @@ const FILE_BASE_URL = `${BASE_URL}/file`
 const userStore = useUserStore();
 
 export const fileAPI = {
-  // 获取初始文件列表
-  async getFileList() {
-    const response = await fetch(`${FILE_BASE_URL}/list`, {
-      headers: {
-        'Authorization': userStore.token
-      }
-    })
-    return response.json()
-  },
-
-  // 获取新文件列表
+  // 获取文件列表
   async getFolderList(folderId) {
     const url = new URL(`${FILE_BASE_URL}/list`);
-    url.searchParams.append('id', folderId);
-
+    if(folderId !== null) {
+      url.searchParams.append('id', folderId);
+    }
     const response = await fetch(url, {
       headers: {
         'Authorization': userStore.token
@@ -34,6 +25,22 @@ export const fileAPI = {
       headers: {
         'Authorization': userStore.token
       }
+    })
+    return response.json()
+  },
+
+  // 创建新文件夹
+  async createFolder(id, name) {
+    const response = await fetch(`${FILE_BASE_URL}/folder`, {
+      method: 'POST',
+      headers: {
+        'Authorization': userStore.token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        parentId: id,
+        name: name
+      })
     })
     return response.json()
   }
