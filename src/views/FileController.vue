@@ -38,12 +38,16 @@ watch(
 // 加载面包屑和文件列表
 async function loadContent() {
   try {
-    fileList.value = await fileAPI.getFolderList(currentFolderId.value)
+    const rawList = await fileAPI.getFolderList(currentFolderId.value);
+    fileList.value = rawList.map(item => ({
+      ...item,
+      editing: false,
+    }));
 
     const trail = [{ id: null, name: '全部文件' }]
     for (const id of currentPathIds.value) {
       const info = await fileAPI.getInformation(id)
-      trail.push({ id, name: info.name })
+      trail.push({ id: id, name: info.name })
     }
     breadcrumbTrail.value = trail
   } catch (error) {
@@ -78,10 +82,32 @@ async function navigateToTrail(index) {
   }
 }
 
+// 点击新建文件夹按钮时
 async function newFolder() {
-  const parentId = currentFolderId.value
-  await fileAPI.createFolder(parentId, '新建文件夹')
-  fileList.value = await fileAPI.getFolderList(currentFolderId.value)
+  const parentId = currentFolderId.value;
+  const defaultName = '新建文件夹';
+
+  const currentFiles = await fileAPI.getFolderList(parentId);
+  const existingNames = new Set(
+      currentFiles
+          .filter(item => item.folder === true)
+          .map(item => item.name)
+  );
+
+  let newName = defaultName;
+  let counter = 1;
+
+  while (existingNames.has(newName)) {
+    counter++;
+    newName = `${defaultName}(${counter})`;
+  }
+
+  const tempInfo = { parentId: parentId, name: newName, folder: true, editing: true }
+
+  fileList.value = [tempInfo, ...fileList.value]
+
+  // await fileAPI.createFolder(parentId, newName);
+  // fileList.value = await fileAPI.getFolderList(parentId);
 }
 </script>
 
@@ -100,6 +126,8 @@ async function newFolder() {
             {{ item.name }}
           </el-breadcrumb-item>
         </el-breadcrumb>
+
+        <!-- 新建文件夹按钮 -->
         <el-button
           type="primary"
           size="large"
@@ -111,24 +139,34 @@ async function newFolder() {
         </el-button>
       </div>
 
-      <div
-          v-for="file in fileList"
-          :key="file.id"
-          class="file-item"
-      >
-        <div
-            v-if="file.folder"
-            class="folder-link file-name"
-            role="button"
-            tabindex="0"
-            @click="pushId(file.id)"
-            @keydown.enter="pushId(file.id)"
-        >
-          {{ file.name || '新对话' }}
+      <div v-for="file in fileList" :key="file.id" class="file-item">
+        <!-- 文件夹 -->
+        <div v-if="file.folder">
+          <input
+              v-if="file.editing"
+              v-model="file.name"
+              @blur="finishEditing(file)"
+              @keyup.enter="finishEditing(file)"
+              class="file-name-input"
+              autofocus
+          />
+          <div
+              v-else
+              class="folder-link file-name"
+              role="button"
+              tabindex="0"
+              @click="pushId(file.id)"
+              @keydown.enter="pushId(file.id)"
+              @keydown.space.prevent="pushId(file.id)"
+          >
+            {{ file.name }}
+          </div>
         </div>
-        <span v-else class="file-name">
-          {{ file.name || '新对话' }}
-        </span>
+
+        <!-- 普通文件 -->
+        <div v-else class="file-name">
+          {{ file.name }}
+        </div>
       </div>
     </el-main>
   </el-container>
