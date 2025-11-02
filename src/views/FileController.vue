@@ -1,7 +1,7 @@
 <script setup>
 import { ElMessage } from "element-plus";
-import { ArrowRight, FolderAdd } from '@element-plus/icons-vue'
-import { ref, watch, computed } from "vue";
+import { ArrowRight, Check, Close, FolderAdd } from '@element-plus/icons-vue'
+import { ref, watch, computed, nextTick } from "vue";
 import { fileAPI } from "../services/file";
 import { useRoute, useRouter } from 'vue-router';
 defineOptions({ name: "FileController" })
@@ -11,6 +11,7 @@ const router = useRouter()
 
 const fileList = ref([])
 const breadcrumbTrail = ref([{ id: null, name: '全部文件' }])
+const existingNew = ref(false)
 
 // 当前路径的 ID 数组（从根到当前文件夹）
 const currentPathIds = computed(() => {
@@ -83,8 +84,12 @@ async function navigateToTrail(index) {
   }
 }
 
-// 点击新建文件夹按钮时
-async function newFolder() {
+// 创建伪文件夹
+async function createTempFolder() {
+  if (existingNew.value) {
+    ElMessage.warning('请先保存或取消新建文件夹')
+    return
+  }
   const parentId = currentFolderId.value;
   const defaultName = '新建文件夹';
 
@@ -104,12 +109,46 @@ async function newFolder() {
     newName = `${defaultName}(${counter})`;
   }
 
-  const tempInfo = { parentId: parentId, name: newName, folder: true, editing: true }
+  // 生成唯一的临时 ID 用于聚焦
+  const tempId = `temp-${Date.now()}`;
+  const tempInfo = { id: tempId, parentId: parentId, name: newName, folder: true, editing: true }
 
   fileList.value = [tempInfo, ...fileList.value]
 
-  // await fileAPI.createFolder(parentId, newName);
-  // fileList.value = await fileAPI.getFolderList(parentId);
+  // 等待 DOM 更新后聚焦输入框
+  await nextTick();
+  // 查找第一个新建文件夹输入框（新建的文件夹总是放在列表第一位）
+  // 更精确地查找：第一个 .file-item 下的 .createFolder-input
+  const firstFileItem = document.querySelector('.file-item');
+  if (firstFileItem) {
+    const inputWrapper = firstFileItem.querySelector('.createFolder-input');
+    if (inputWrapper) {
+      // Element Plus 的 el-input 内部会有一个 input 元素
+      const inputEl = inputWrapper.querySelector('input');
+      if (inputEl) {
+        inputEl.focus();
+      }
+    }
+  }
+  existingNew.value = true
+}
+
+// 创建文件夹
+async function createFolder(parentId, newName) {
+  await fileAPI.createFolder(parentId, newName);
+
+  const responseJson = await fileAPI.getFolderList(parentId);
+  fileList.value = responseJson.data;
+
+  existingNew.value = false;
+  ElMessage.success('创建成功！')
+}
+
+// 取消新建文件夹
+async function cancelTempFolder() {
+  const responseJson = await fileAPI.getFolderList(currentFolderId.value);
+  fileList.value = responseJson.data;
+  existingNew.value = false
 }
 </script>
 
@@ -134,7 +173,7 @@ async function newFolder() {
           type="primary"
           size="large"
           class="createFolder-button"
-          @click="newFolder()"
+          @click="createTempFolder()"
         >
           <el-icon><FolderAdd /></el-icon>
           <span>新建文件夹</span>
@@ -146,12 +185,19 @@ async function newFolder() {
         <div v-if="file.folder">
 
           <!-- 新建文件夹 -->
-          <input
-              v-if="file.editing"
-              v-model="file.name"
-              class="file-name-input"
-              autofocus
-          />
+          <div v-if="file.editing">
+            <el-input
+                class="createFolder-input"
+                v-model="file.name"
+                clearable
+            />
+            <el-button type="primary" @click="createFolder(currentFolderId, file.name)">
+              <el-icon><Check /></el-icon>
+            </el-button>
+            <el-button @click="cancelTempFolder()">
+              <el-icon><Close /></el-icon>
+            </el-button>
+          </div>
 
           <!-- 普通文件夹 -->
           <div
@@ -236,6 +282,12 @@ async function newFolder() {
 }
 
 .createFolder-button {
+  margin-right: 16px;
+}
+
+.createFolder-input {
+  width: 200px;
+  height: auto;
   margin-right: 16px;
 }
 </style>
