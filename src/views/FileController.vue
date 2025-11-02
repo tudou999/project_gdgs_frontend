@@ -38,15 +38,16 @@ watch(
 // 加载面包屑和文件列表
 async function loadContent() {
   try {
-    const rawList = await fileAPI.getFolderList(currentFolderId.value);
-    fileList.value = rawList.map(item => ({
+    const responseJson = await fileAPI.getFolderList(currentFolderId.value);
+    fileList.value = responseJson.data.map(item => ({
       ...item,
       editing: false,
     }));
 
     const trail = [{ id: null, name: '全部文件' }]
     for (const id of currentPathIds.value) {
-      const info = await fileAPI.getInformation(id)
+      const responseJson = await fileAPI.getInformation(id)
+      const info = responseJson.data
       trail.push({ id: id, name: info.name })
     }
     breadcrumbTrail.value = trail
@@ -87,7 +88,8 @@ async function newFolder() {
   const parentId = currentFolderId.value;
   const defaultName = '新建文件夹';
 
-  const currentFiles = await fileAPI.getFolderList(parentId);
+  const responseJson = await fileAPI.getFolderList(parentId);
+  const currentFiles = responseJson.data
   const existingNames = new Set(
       currentFiles
           .filter(item => item.folder === true)
@@ -142,14 +144,16 @@ async function newFolder() {
       <div v-for="file in fileList" :key="file.id" class="file-item">
         <!-- 文件夹 -->
         <div v-if="file.folder">
+
+          <!-- 新建文件夹 -->
           <input
               v-if="file.editing"
               v-model="file.name"
-              @blur="finishEditing(file)"
-              @keyup.enter="finishEditing(file)"
               class="file-name-input"
               autofocus
           />
+
+          <!-- 普通文件夹 -->
           <div
               v-else
               class="folder-link file-name"
