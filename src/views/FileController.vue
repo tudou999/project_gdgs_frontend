@@ -1,6 +1,6 @@
 <script setup>
 import { ElMessage } from "element-plus";
-import { ArrowRight, Check, Close, FolderAdd } from '@element-plus/icons-vue'
+import {ArrowRight, Check, Close, Operation, FolderAdd} from '@element-plus/icons-vue'
 import { ref, watch, computed, nextTick } from "vue";
 import { fileAPI } from "../services/file";
 import { useRoute, useRouter } from 'vue-router';
@@ -181,41 +181,44 @@ async function cancelTempFolder() {
       </div>
 
       <div v-for="file in fileList" :key="file.id" class="file-item">
-        <!-- 文件夹 -->
-        <div v-if="file.folder">
 
-          <!-- 新建文件夹 -->
-          <div v-if="file.editing">
-            <el-input
-                class="createFolder-input"
-                v-model="file.name"
-                clearable
-            />
-            <el-button type="primary" @click="createFolder(currentFolderId, file.name)">
-              <el-icon><Check /></el-icon>
-            </el-button>
-            <el-button @click="cancelTempFolder()">
-              <el-icon><Close /></el-icon>
-            </el-button>
-          </div>
-
-          <!-- 普通文件夹 -->
-          <div
-              v-else
-              class="folder-link file-name"
-              role="button"
-              tabindex="0"
-              @click="pushId(file.id)"
-              @keydown.enter="pushId(file.id)"
-              @keydown.space.prevent="pushId(file.id)"
-          >
-            {{ file.name }}
-          </div>
+        <!-- 编辑状态 -->
+        <div v-if="file.editing">
+          <el-input
+              class="createFolder-input"
+              v-model="file.name"
+              clearable
+          />
+          <el-button type="primary" @click="createFolder(currentFolderId, file.name)">
+            <el-icon><Check /></el-icon>
+          </el-button>
+          <el-button @click="cancelTempFolder()">
+            <el-icon><Close /></el-icon>
+          </el-button>
         </div>
 
-        <!-- 普通文件 -->
-        <div v-else class="file-name">
-          {{ file.name }}
+        <!-- 正常状态 -->
+        <div v-else class="file-item-normal">
+
+          <!-- 文件夹 -->
+          <div v-if="file.folder"
+               class="folder-link file-name"
+               role="button"
+               tabindex="0"
+               @click="pushId(file.id)"
+               @keydown.enter="pushId(file.id)"
+               @keydown.space.prevent="pushId(file.id)">
+            {{ file.name }}
+          </div>
+
+          <!-- 文件 -->
+          <div v-else class="file-name">
+            {{ file.name }}
+          </div>
+
+          <el-button class="action-button">
+            <el-icon><Operation /></el-icon>
+          </el-button>
         </div>
       </div>
     </el-main>
@@ -289,5 +292,17 @@ async function cancelTempFolder() {
   width: 200px;
   height: auto;
   margin-right: 16px;
+}
+
+.file-item-normal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.action-button {
+  flex-shrink: 0; // 防止按钮被压缩
+  margin-left: 12px; // 可选：与文字保持一点间距
 }
 </style>
