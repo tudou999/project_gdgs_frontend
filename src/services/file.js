@@ -59,5 +59,17 @@ export const fileAPI = {
       })
     });
     return response.json()
+  },
+
+  // 删除文件/文件夹
+  async deleteDeleteFile(id) {
+    const response = await fetch(`${FILE_BASE_URL}/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': userStore.token,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.json();
   }
 }

@@ -211,6 +211,21 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
     }
   }
 }
+
+async function deleteFile(id) {
+  try {
+    const responseJson = await fileAPI.deleteDeleteFile(id);
+    if (responseJson.code === 200) {
+      await reloadContent()
+      ElMessage.success('删除成功！')
+    } else {
+      ElMessage.error('删除失败：', responseJson.msg)
+    }
+  } catch (error) {
+    console.error('删除失败:', error)
+    ElMessage.warning('删除失败！请联系管理员')
+  }
+}
 </script>
 
 <template>
@@ -237,23 +252,26 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
           @click="clickCreateFolder()"
         >
           <el-icon><FolderAdd /></el-icon>
-          <span>新建文件夹</span>
+          <span style="font-size: 12px">新建文件夹</span>
         </el-button>
       </div>
 
       <div v-for="file in fileList" :key="file.id" class="file-item">
 
         <!-- 编辑状态 -->
-        <div v-if="file.editing !== 0">
+        <div v-if="file.editing !== 0" class="file-item-editing">
           <el-input
               class="name-input"
               v-model="file.name"
               clearable
           />
-          <el-button type="primary" @click="checkOrRename(file.editing, currentFolderId, file.id, file.name)" size="large">
+          <el-button
+              type="primary"
+              @click="checkOrRename(file.editing, currentFolderId, file.id, file.name)"
+              size="small">
             <el-icon><Check /></el-icon>
           </el-button>
-          <el-button @click="reloadContent()" size="large">
+          <el-button @click="reloadContent()" size="small">
             <el-icon><Close /></el-icon>
           </el-button>
         </div>
@@ -277,19 +295,37 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
             {{ file.name }}
           </div>
 
-          <el-dropdown trigger="click" size="large">
+          <el-dropdown
+              trigger="click"
+              size="large"
+              :hide-on-click="false">
             <el-button size="large">
-              菜单<el-icon class="el-icon--right"><Operation /></el-icon>
+              菜单
+              <el-icon class="el-icon--right" size="large"><Operation /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item>下载</el-dropdown-item>
                 <el-dropdown-item @click="clickRenameButton(file)">重命名</el-dropdown-item>
-                <el-dropdown-item>删除</el-dropdown-item>
+                <el-dropdown-item class="my-class">
+                  <el-popconfirm
+                      icon-color="#f56c6c"
+                      title="确定要删除吗？"
+                      confirm-button-text="确定"
+                      @confirm="deleteFile(file.id)"
+                      confirm-button-type="danger"
+                      cancel-button-text="取消"
+                      @cancel="reloadContent()"
+                      cancel-button-type="info"
+                  >
+                    <template #reference>
+                      <span class="dropdown-item-delete-fullSpan">删除</span>
+                    </template>
+                  </el-popconfirm>
+                </el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-
         </div>
       </div>
     </el-main>
@@ -301,9 +337,8 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
   font-size: 16px;
   padding: 10px 16px;
   margin-bottom: 8px;
-  background-color: #f5f7fa;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   transition: background-color 0.2s ease;
   cursor: pointer;
 }
@@ -314,35 +349,28 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
 
 .el-breadcrumb {
   padding: 16px 24px;
-  background-color: #f9fafb;
-  border-bottom: 1px solid #e4e7ed;
   margin-bottom: 20px;
 
   .el-breadcrumb__item {
     .el-breadcrumb__inner {
-      color: #606266;
       font-size: 14px;
       transition: color 0.2s ease;
 
       &:not(.is-disabled) {
         cursor: pointer;
-        color: #409eff;
 
         &:hover {
-          color: #66b1ff;
           text-decoration: underline;
         }
       }
 
       &.is-disabled {
         cursor: default;
-        color: #909399;
         font-weight: normal;
       }
     }
 
     .el-breadcrumb__separator {
-      color: #c0c4cc;
       margin: 0 8px;
     }
   }
@@ -353,7 +381,9 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  background-color: #f9fafb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  min-height: 50px;
 }
 
 .createFolder-button {
@@ -363,8 +393,15 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
 .name-input {
   font-size: 16px;
   width: 200px;
-  min-height: 40px;
+  min-height: 28px;
   margin-right: 16px;
+}
+
+.file-item-editing {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
 }
 
 .file-item-normal {
@@ -377,5 +414,18 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
 .action-button {
   flex-shrink: 0;
   margin-left: 12px;
+}
+
+.dropdown-item-delete-fullSpan {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: 7px 20px;
+}
+
+::v-deep(.el-dropdown-menu__item.my-class) {
+  padding: 0;
 }
 </style>
