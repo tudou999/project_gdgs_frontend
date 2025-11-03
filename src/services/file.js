@@ -30,7 +30,7 @@ export const fileAPI = {
   },
 
   // 创建新文件夹
-  async createFolder(id, name) {
+  async postCreateFolder(id, name) {
     const response = await fetch(`${FILE_BASE_URL}/folder`, {
       method: 'POST',
       headers: {
@@ -42,6 +42,22 @@ export const fileAPI = {
         name: name
       })
     })
+    return response.json()
+  },
+
+  // 重命名文件/文件夹
+  async putRenameFile(id, name) {
+    const response = await fetch(`${FILE_BASE_URL}/rename`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': userStore.token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        id: id,
+        newName: name
+      })
+    });
     return response.json()
   }
 }

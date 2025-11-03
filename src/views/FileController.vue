@@ -39,23 +39,24 @@ watch(
 // 加载面包屑和文件列表
 async function loadContent() {
   try {
-    const responseJson = await fileAPI.getFolderList(currentFolderId.value);
-    fileList.value = responseJson.data.map(item => ({
-      ...item,
-      editing: false,
-    }));
+    await reloadContent()
 
     const trail = [{ id: null, name: '全部文件' }]
     for (const id of currentPathIds.value) {
       const responseJson = await fileAPI.getInformation(id)
-      const info = responseJson.data
-      trail.push({ id: id, name: info.name })
+      if (responseJson.code !== 200) {
+        const info = responseJson.data
+        trail.push({ id: id, name: info.name })
+      }
+      else {
+        ElMessage.error('加载失败：', responseJson.msg)
+        await router.replace({ path: '/file' })
+      }
     }
     breadcrumbTrail.value = trail
   } catch (error) {
     console.error('加载失败:', error)
     ElMessage.warning('加载失败！请联系管理员')
-    await router.replace({ path: '/file' })
   }
 }
 
@@ -84,8 +85,8 @@ async function navigateToTrail(index) {
   }
 }
 
-// 创建伪文件夹
-async function createTempFolder() {
+// 点击新建文件夹按钮
+async function clickCreateFolder() {
   if (existingNew.value) {
     ElMessage.warning('请先保存或取消新建文件夹')
     return
@@ -94,61 +95,121 @@ async function createTempFolder() {
   const defaultName = '新建文件夹';
 
   const responseJson = await fileAPI.getFolderList(parentId);
-  const currentFiles = responseJson.data
-  const existingNames = new Set(
-      currentFiles
-          .filter(item => item.folder === true)
-          .map(item => item.name)
-  );
+  if (responseJson.code === 200) {
+    const currentFiles = responseJson.data
+    const existingNames = new Set(
+        currentFiles
+            .filter(item => item.folder === true)
+            .map(item => item.name)
+    );
 
-  let newName = defaultName;
-  let counter = 1;
+    let newName = defaultName;
+    let counter = 1;
 
-  while (existingNames.has(newName)) {
-    counter++;
-    newName = `${defaultName}(${counter})`;
-  }
+    while (existingNames.has(newName)) {
+      counter++;
+      newName = `${defaultName}(${counter})`;
+    }
 
-  // 生成唯一的临时 ID 用于聚焦
-  const tempId = `temp-${Date.now()}`;
-  const tempInfo = { id: tempId, parentId: parentId, name: newName, folder: true, editing: true }
+    // 生成唯一的临时 ID 用于聚焦
+    const tempId = `temp-${Date.now()}`;
+    const tempInfo = { id: tempId, parentId: parentId, name: newName, folder: true, editing: 1 }
 
-  fileList.value = [tempInfo, ...fileList.value]
+    fileList.value = [tempInfo, ...fileList.value]
 
-  // 等待 DOM 更新后聚焦输入框
-  await nextTick();
-  // 查找第一个新建文件夹输入框（新建的文件夹总是放在列表第一位）
-  // 更精确地查找：第一个 .file-item 下的 .createFolder-input
-  const firstFileItem = document.querySelector('.file-item');
-  if (firstFileItem) {
-    const inputWrapper = firstFileItem.querySelector('.createFolder-input');
-    if (inputWrapper) {
-      // Element Plus 的 el-input 内部会有一个 input 元素
-      const inputEl = inputWrapper.querySelector('input');
-      if (inputEl) {
-        inputEl.focus();
+    // 等待 DOM 更新后聚焦输入框
+    await nextTick();
+    // 查找第一个新建文件夹输入框（新建的文件夹总是放在列表第一位）
+    // 更精确地查找：第一个 .file-item 下的 .createFolder-input
+    const firstFileItem = document.querySelector('.file-item');
+    if (firstFileItem) {
+      const inputWrapper = firstFileItem.querySelector('.createFolder-input');
+      if (inputWrapper) {
+        // Element Plus 的 el-input 内部会有一个 input 元素
+        const inputEl = inputWrapper.querySelector('input');
+        if (inputEl) {
+          inputEl.focus();
+        }
       }
     }
+    existingNew.value = true
   }
-  existingNew.value = true
+  else {
+    ElMessage.error('加载失败：', responseJson.msg)
+  }
+
 }
 
 // 创建文件夹
 async function createFolder(parentId, newName) {
-  await fileAPI.createFolder(parentId, newName);
-
-  const responseJson = await fileAPI.getFolderList(parentId);
-  fileList.value = responseJson.data;
-
-  existingNew.value = false;
-  ElMessage.success('创建成功！')
+  try {
+    const responseJson = await fileAPI.postCreateFolder(parentId, newName);
+    if (responseJson.code === 200) {
+      await reloadContent()
+      ElMessage.success('创建成功！')
+    }
+    else {
+      ElMessage.error('创建失败：', responseJson.msg)
+    }
+  } catch (error) {
+    console.error('创建文件夹失败:', error)
+    ElMessage.warning('创建文件夹失败！请联系管理员')
+  }
 }
 
-// 取消新建文件夹
-async function cancelTempFolder() {
-  const responseJson = await fileAPI.getFolderList(currentFolderId.value);
-  fileList.value = responseJson.data;
-  existingNew.value = false
+// 重新加载目录，取消新建文件夹
+async function reloadContent() {
+  try {
+    const responseJson = await fileAPI.getFolderList(currentFolderId.value);
+    if (responseJson.code === 200) {
+      fileList.value = responseJson.data.map(item => ({
+        ...item,
+        editing: 0,
+      }));
+      existingNew.value = false
+    }
+    else {
+      ElMessage.error('加载失败：', responseJson.msg)
+    }
+  }
+  catch (error) {
+    console.error('加载失败:', error)
+    ElMessage.warning('加载失败！请联系管理员')
+  }
+}
+
+// 点击重命名文件按钮
+async function clickRenameButton(file) {
+  file.editing = 2;
+  await nextTick();
+  const inputEl = document.querySelector('.file-item .name-input input');
+  if (inputEl) {
+    inputEl.focus();
+  }
+}
+
+// 判断打钩执行的是新建还是重命名
+async function checkOrRename(editing, fatherId, checkedId, name) {
+  // editing: 1 新建文件夹 2 重命名文件
+  if (editing === 1) {
+    const responseJson = await createFolder(fatherId, name)
+    if (responseJson.code === 200) {
+      await reloadContent()
+      ElMessage.success('创建成功！')
+    }
+    else {
+      ElMessage.error('创建失败：', responseJson.msg)
+    }
+  } else if (editing === 2) {
+    const responseJson = await fileAPI.putRenameFile(checkedId, name);
+    if (responseJson.code === 200) {
+      await reloadContent()
+      ElMessage.success('重命名成功！')
+    }
+    else {
+      ElMessage.error('重命名失败：', responseJson.msg)
+    }
+  }
 }
 </script>
 
@@ -173,7 +234,7 @@ async function cancelTempFolder() {
           type="primary"
           size="large"
           class="createFolder-button"
-          @click="createTempFolder()"
+          @click="clickCreateFolder()"
         >
           <el-icon><FolderAdd /></el-icon>
           <span>新建文件夹</span>
@@ -183,16 +244,16 @@ async function cancelTempFolder() {
       <div v-for="file in fileList" :key="file.id" class="file-item">
 
         <!-- 编辑状态 -->
-        <div v-if="file.editing">
+        <div v-if="file.editing !== 0">
           <el-input
-              class="createFolder-input"
+              class="name-input"
               v-model="file.name"
               clearable
           />
-          <el-button type="primary" @click="createFolder(currentFolderId, file.name)">
+          <el-button type="primary" @click="checkOrRename(file.editing, currentFolderId, file.id, file.name)" size="large">
             <el-icon><Check /></el-icon>
           </el-button>
-          <el-button @click="cancelTempFolder()">
+          <el-button @click="reloadContent()" size="large">
             <el-icon><Close /></el-icon>
           </el-button>
         </div>
@@ -216,9 +277,19 @@ async function cancelTempFolder() {
             {{ file.name }}
           </div>
 
-          <el-button class="action-button">
-            <el-icon><Operation /></el-icon>
-          </el-button>
+          <el-dropdown trigger="click" size="large">
+            <el-button size="large">
+              菜单<el-icon class="el-icon--right"><Operation /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item>下载</el-dropdown-item>
+                <el-dropdown-item @click="clickRenameButton(file)">重命名</el-dropdown-item>
+                <el-dropdown-item>删除</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+
         </div>
       </div>
     </el-main>
@@ -227,6 +298,7 @@ async function cancelTempFolder() {
 
 <style scoped lang="scss">
 .file-item {
+  font-size: 16px;
   padding: 10px 16px;
   margin-bottom: 8px;
   background-color: #f5f7fa;
@@ -288,9 +360,10 @@ async function cancelTempFolder() {
   margin-right: 16px;
 }
 
-.createFolder-input {
+.name-input {
+  font-size: 16px;
   width: 200px;
-  height: auto;
+  min-height: 40px;
   margin-right: 16px;
 }
 
@@ -302,7 +375,7 @@ async function cancelTempFolder() {
 }
 
 .action-button {
-  flex-shrink: 0; // 防止按钮被压缩
-  margin-left: 12px; // 可选：与文字保持一点间距
+  flex-shrink: 0;
+  margin-left: 12px;
 }
 </style>
