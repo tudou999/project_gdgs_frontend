@@ -6,7 +6,7 @@
       <el-aside class="sidebar">
         <div class="history-header">
           <h2>聊天记录</h2>
-          <button class="new-chat" @click="startNewChat">
+          <button class="new-chat" @click="startNewChat()">
             <PlusIcon class="icon" />
             新对话
           </button>
@@ -39,49 +39,18 @@
           />
         </div>
         <div class="input-area">
-          <div v-if="selectedFiles.length > 0" class="selected-files">
-            <div v-for="(file, index) in selectedFiles" :key="index" class="file-item">
-              <div class="file-info">
-                <DocumentIcon class="icon" />
-                <span class="file-name">{{ file.name }}</span>
-                <span class="file-size">({{ formatFileSize(file.size) }})</span>
-              </div>
-              <button class="remove-btn" @click="removeFile(index)">
-                <XMarkIcon class="icon" />
-              </button>
-            </div>
-          </div>
-
           <div class="input-row">
-            <div class="file-upload">
-              <input 
-                type="file" 
-                ref="fileInput"
-                @change="handleFileUpload"
-                accept="image/*,audio/*,video/*"
-                multiple
-                class="hidden"
-              >
-              <button 
-                class="upload-btn"
-                @click="triggerFileInput"
-                :disabled="isStreaming"
-              >
-                <PaperClipIcon class="icon" />
-              </button>
-            </div>
-
             <textarea
               v-model="userInput"
               @keydown.enter.prevent="sendMessage"
-              :placeholder="getPlaceholder()"
+              placeholder="向CORS智能助手提问"
               rows="1"
               ref="inputRef"
             ></textarea>
             <button 
               class="send-button" 
               @click="sendMessage"
-              :disabled="isStreaming || (!userInput.trim() && !selectedFiles.length)"
+              :disabled="isStreaming || (!userInput.trim())"
             >
               <PaperAirplaneIcon class="icon" />
             </button>
@@ -99,19 +68,14 @@ defineOptions ({
 })
 
 import {nextTick, onMounted, ref} from 'vue'
-import {useDark} from '@vueuse/core'
 import {
   ChatBubbleLeftRightIcon,
-  DocumentIcon,
   PaperAirplaneIcon,
-  PaperClipIcon,
   PlusIcon,
-  XMarkIcon
 } from '@heroicons/vue/24/outline'
 import ChatMessage from '../components/ChatMessage.vue'
 import {chatAPI} from '../services/api'
 
-const isDark = useDark()
 const messagesRef = ref(null)
 const inputRef = ref(null)
 const userInput = ref('')
@@ -119,8 +83,6 @@ const isStreaming = ref(false)
 const currentChatId = ref(null)
 const currentMessages = ref([])
 const chatHistory = ref([])
-const fileInput = ref(null)
-const selectedFiles = ref([])
 
 // 开始新对话
 const startNewChat = () => {
@@ -168,7 +130,7 @@ const loadChat = async (chatId) => {
 // 修改发送消息函数
 const sendMessage = async () => {
   if (isStreaming.value) return
-  if (!userInput.value.trim() && !selectedFiles.value.length) return
+  if (!userInput.value.trim()) return
 
   const messageContent = userInput.value.trim()
 
@@ -190,9 +152,6 @@ const sendMessage = async () => {
   if (messageContent) {
     formData.append('prompt', messageContent)
   }
-  selectedFiles.value.forEach(file => {
-    formData.append('files', file)
-  })
 
   // 添加助手消息占位
   const assistantMessage = {
@@ -228,8 +187,6 @@ const sendMessage = async () => {
     currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
   } finally {
     isStreaming.value = false
-    selectedFiles.value = [] // 清空已选文件
-    fileInput.value.value = '' // 清空文件输入
 
     // 移除事件监听器
     window.removeEventListener('streamData', handleStreamData)
@@ -246,146 +203,6 @@ const adjustTextareaHeight = () => {
     textarea.style.height = textarea.scrollHeight + 'px'
   }else{
     textarea.style.height = '50px'
-  }
-}
-
-// 文件类型限制
-const FILE_LIMITS = {
-  image: { 
-    maxSize: 10 * 1024 * 1024,  // 单个文件 10MB
-    maxFiles: 3,                 // 最多 3 个文件
-    description: '图片文件'
-  },
-  audio: { 
-    maxSize: 10 * 1024 * 1024,  // 单个文件 10MB
-    maxDuration: 180,           // 3分钟
-    maxFiles: 3,                // 最多 3 个文件
-    description: '音频文件'
-  },
-  video: { 
-    maxSize: 150 * 1024 * 1024, // 单个文件 150MB
-    maxDuration: 40,            // 40秒
-    maxFiles: 3,                // 最多 3 个文件
-    description: '视频文件'
-  }
-}
-
-// 触发文件选择
-const triggerFileInput = () => {
-  fileInput.value?.click()
-}
-
-// 检查文件是否符合要求
-const validateFile = async (file) => {
-  const type = file.type.split('/')[0]
-  const limit = FILE_LIMITS[type]
-  
-  if (!limit) {
-    return { valid: false, error: '不支持的文件类型' }
-  }
-  
-  if (file.size > limit.maxSize) {
-    return { valid: false, error: `文件大小不能超过${limit.maxSize / 1024 / 1024}MB` }
-  }
-  
-  if ((type === 'audio' || type === 'video') && limit.maxDuration) {
-    try {
-      const duration = await getMediaDuration(file)
-      if (duration > limit.maxDuration) {
-        return { 
-          valid: false, 
-          error: `${type === 'audio' ? '音频' : '视频'}时长不能超过${limit.maxDuration}秒`
-        }
-      }
-    } catch (error) {
-      return { valid: false, error: '无法读取媒体文件时长' }
-    }
-  }
-  
-  return { valid: true }
-}
-
-// 获取媒体文件时长
-const getMediaDuration = (file) => {
-  return new Promise((resolve, reject) => {
-    const element = file.type.startsWith('audio/') ? new Audio() : document.createElement('video')
-    element.preload = 'metadata'
-    
-    element.onloadedmetadata = () => {
-      resolve(element.duration)
-      URL.revokeObjectURL(element.src)
-    }
-    
-    element.onerror = () => {
-      reject(new Error('无法读取媒体文件'))
-      URL.revokeObjectURL(element.src)
-    }
-    
-    element.src = URL.createObjectURL(file)
-  })
-}
-
-// 修改文件上传处理函数
-const handleFileUpload = async (event) => {
-  const files = Array.from(event.target.files || [])
-  if (!files.length) return
-  
-  // 检查所有文件类型是否一致
-  const firstFileType = files[0].type.split('/')[0]
-  const hasInconsistentType = files.some(file => file.type.split('/')[0] !== firstFileType)
-  
-  if (hasInconsistentType) {
-    alert('请选择相同类型的文件（图片、音频或视频）')
-    event.target.value = ''
-    return
-  }
-
-  // 验证所有文件
-  for (const file of files) {
-    const { valid, error } = await validateFile(file)
-    if (!valid) {
-      alert(error)
-      event.target.value = ''
-      selectedFiles.value = []
-      return
-    }
-  }
-
-  // 检查文件总大小
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0)
-  const limit = FILE_LIMITS[firstFileType]
-  if (totalSize > limit.maxSize * 3) { // 允许最多3个文件的总大小
-    alert(`${firstFileType === 'image' ? '图片' : firstFileType === 'audio' ? '音频' : '视频'}文件总大小不能超过${(limit.maxSize * 3) / 1024 / 1024}MB`)
-    event.target.value = ''
-    selectedFiles.value = []
-    return
-  }
-
-  selectedFiles.value = files
-}
-
-// 修改文件输入提示
-const getPlaceholder = () => {
-  if (selectedFiles.value.length > 0) {
-    const type = selectedFiles.value[0].type.split('/')[0]
-    const desc = FILE_LIMITS[type].description
-    return `已选择 ${selectedFiles.value.length} 个${desc}，可继续输入消息...`
-  }
-  return '输入消息，可上传图片、音频或视频...'
-}
-
-// 格式化文件大小
-const formatFileSize = (bytes) => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
-
-// 移除文件
-const removeFile = (index) => {
-  selectedFiles.value = selectedFiles.value.filter((_, i) => i !== index)
-  if (selectedFiles.value.length === 0) {
-    fileInput.value.value = ''  // 清空文件输入
   }
 }
 
@@ -702,118 +519,6 @@ onMounted(() => {
     }
   }
 }
-
-//.dark {
-//  .sidebar {
-//    background: rgba(40, 40, 40, 0.95);
-//    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-//  }
-//
-//  .chat-main {
-//    background: rgba(40, 40, 40, 0.95);
-//    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-//
-//    .input-area {
-//      background: rgba(30, 30, 30, 0.98);
-//      border-top: 1px solid rgba(255, 255, 255, 0.05);
-//
-//      .selected-files {
-//        background: rgba(255, 255, 255, 0.02);
-//        border-color: rgba(255, 255, 255, 0.05);
-//
-//        .file-item {
-//          background: rgba(255, 255, 255, 0.02);
-//          border-color: rgba(255, 255, 255, 0.05);
-//
-//          &:hover {
-//            background: rgba(0, 124, 240, 0.1);
-//            border-color: rgba(0, 124, 240, 0.3);
-//          }
-//
-//          .file-info {
-//            .icon {
-//              color: #007CF0;
-//            }
-//
-//            .file-name {
-//              color: #fff;
-//            }
-//
-//            .file-size {
-//              color: #999;
-//              background: rgba(255, 255, 255, 0.1);
-//            }
-//          }
-//
-//          .remove-btn {
-//            background: rgba(255, 255, 255, 0.1);
-//            color: #999;
-//
-//            &:hover {
-//              background: #ff4d4f;
-//              color: #fff;
-//            }
-//          }
-//        }
-//      }
-//
-//      .input-row {
-//        background: rgba(255, 255, 255, 0.02);
-//        border-color: rgba(255, 255, 255, 0.05);
-//        box-shadow: none;
-//
-//        textarea {
-//          color: #fff;
-//
-//          &::placeholder {
-//            color: #666;
-//          }
-//        }
-//
-//        .file-upload .upload-btn {
-//          background: rgba(0, 124, 240, 0.2);
-//          color: #007CF0;
-//
-//          &:hover:not(:disabled) {
-//            background: rgba(0, 124, 240, 0.3);
-//          }
-//        }
-//      }
-//    }
-//  }
-//
-//  .history-item {
-//    &:hover {
-//      background: rgba(255, 255, 255, 0.05) !important;
-//    }
-//
-//    &.active {
-//      background: rgba(0, 124, 240, 0.2) !important;
-//    }
-//  }
-//
-//  textarea {
-//    background: rgba(255, 255, 255, 0.05) !important;
-//
-//    &:focus {
-//      background: rgba(255, 255, 255, 0.1) !important;
-//    }
-//  }
-//
-//  .input-area {
-//    .file-upload {
-//      .upload-btn {
-//        background: rgba(255, 255, 255, 0.1);
-//        color: #999;
-//
-//        &:hover:not(:disabled) {
-//          background: rgba(255, 255, 255, 0.2);
-//          color: #fff;
-//        }
-//      }
-//    }
-//  }
-//}
 
 @media (max-width: 768px) {
   .ai-chat {
