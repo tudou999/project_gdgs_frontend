@@ -2,14 +2,18 @@
   <el-container class="ai-chat">
     <el-container class="chat-container">
 
-<!--      侧边栏-->
+      <!-- 侧边栏 -->
       <el-aside class="sidebar">
         <div class="history-header">
           <h2>聊天记录</h2>
-          <button class="new-chat" @click="startNewChat()">
-            <PlusIcon class="icon" />
+          <el-button size="large"
+                     @click="startNewChat()"
+                     type="primary">
+            <el-icon>
+              <ChatDotSquare/>
+            </el-icon>
             新对话
-          </button>
+          </el-button>
         </div>
         <div class="history-list">
           <div 
@@ -25,7 +29,7 @@
         </div>
       </el-aside>
 
-<!--      主区域-->
+      <!-- 主区域 -->
       <el-main class="chat-main">
         <div class="messages" ref="messagesRef">
           <ChatMessage
@@ -40,16 +44,14 @@
         </div>
         <div class="input-area">
           <div class="input-row">
-            <textarea
-              v-model="userInput"
-              @keydown.enter.prevent="sendMessage"
-              placeholder="向CORS智能助手提问"
-              rows="1"
-              ref="inputRef"
-            ></textarea>
+            <textarea v-model="userInput"
+                      @keydown.enter.prevent="startStream"
+                      placeholder="向CORS智能助手提问"
+                      rows="1"
+                      ref="inputRef"/>
             <button 
               class="send-button" 
-              @click="sendMessage"
+              @click="startStream(userInput, currentChatId)"
               :disabled="isStreaming || (!userInput.trim())"
             >
               <PaperAirplaneIcon class="icon" />
@@ -63,6 +65,8 @@
 </template>
 
 <script setup>
+import {ChatDotSquare} from "@element-plus/icons-vue";
+
 defineOptions ({
   name: 'AIChat'
 })
@@ -71,10 +75,11 @@ import {nextTick, onMounted, ref} from 'vue'
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
-  PlusIcon,
 } from '@heroicons/vue/24/outline'
 import ChatMessage from '../components/ChatMessage.vue'
 import {chatAPI} from '../services/api'
+import {fetchEventSource} from "@microsoft/fetch-event-source";
+import { useUserStore } from '../stores/user'
 
 const messagesRef = ref(null)
 const inputRef = ref(null)
@@ -84,8 +89,12 @@ const currentChatId = ref(null)
 const currentMessages = ref([])
 const chatHistory = ref([])
 
+// 当前 AI 正在生成的回复
+const currentResponse = ref('')
+
+const userStore = useUserStore()
 // 开始新对话
-const startNewChat = () => {
+async function startNewChat() {
   const newChatId = Date.now().toString()
   currentChatId.value = newChatId
   currentMessages.value = []
@@ -99,7 +108,7 @@ const startNewChat = () => {
 }
 
 // 加载聊天历史
-const loadChatHistory = async () => {
+async function loadChatHistory() {
   try {
     const history = await chatAPI.getChatHistory()
     chatHistory.value = history || []
@@ -116,7 +125,7 @@ const loadChatHistory = async () => {
 }
 
 // 加载特定对话
-const loadChat = async (chatId) => {
+async function loadChat(chatId) {
   currentChatId.value = chatId
   try {
     currentMessages.value = await chatAPI.getChatMessages(chatId)
@@ -127,76 +136,87 @@ const loadChat = async (chatId) => {
   }
 }
 
-// 修改发送消息函数
-const sendMessage = async () => {
-  if (isStreaming.value) return
-  if (!userInput.value.trim()) return
+// 发送消息（支持从输入框或直接参数触发）
+function startStream(data, sessionId) {
+  // 取提示词：优先显式 data，其次输入框
+  const prompt = (typeof data === 'string' ? data : userInput.value || '').trim()
+  if (!prompt) return
 
-  const messageContent = userInput.value.trim()
-
-  // 添加用户消息
-  const userMessage = {
-    senderType: 0,
-    contents: messageContent,
-    timestamp: new Date()
-  }
-  currentMessages.value.push(userMessage)
-
-  // 清空输入
-  userInput.value = ''
-  adjustTextareaHeight()
-  await scrollToBottom()
-
-  // 准备发送数据
-  const formData = new FormData()
-  if (messageContent) {
-    formData.append('prompt', messageContent)
-  }
-
-  // 添加助手消息占位
-  const assistantMessage = {
-    senderType: 1,
-    contents: '',
-    timestamp: new Date()
-  }
-  currentMessages.value.push(assistantMessage)
-
-  console .log('发送数据:', currentMessages)
+  // 重置状态
+  currentResponse.value = ''
   isStreaming.value = true
 
-  // 监听流式数据事件
-  const handleStreamData = (event) => {
-    const { data } = event.detail
-    assistantMessage.contents += data
+  // 将用户消息加入消息区
+  currentMessages.value.push({
+    senderType: 0,
+    contents: prompt
+  })
 
-    // 更新消息内容
-    const lastIndex = currentMessages.value.length - 1
-    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
-    scrollToBottom()
+  // 为助手添加一条占位消息，边流边更新
+  const assistantIndex = currentMessages.value.length
+  currentMessages.value.push({
+    senderType: 1,
+    contents: ''
+  })
+
+  // 清空输入框并滚动
+  if (!data) userInput.value = ''
+  scrollToBottom()
+
+  // 组织请求 URL 与会话
+  const url = new URL('http://localhost/api/v1/assistant/chat')
+  const sid = sessionId || currentChatId.value
+  if (sid) {
+    url.searchParams.append('session', String(sid))
   }
 
-  // 添加事件监听器
-  window.addEventListener('streamData', handleStreamData)
+  console.log('🚀🚀🚀🚀：信息开始发送')
+  fetchEventSource(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': userStore.token,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message: prompt }),
+    onmessage(event) {
+      if (!event.data) return
 
-  try {
-    await chatAPI.sendMessage(formData, currentChatId.value)
-  } catch (error) {
-    console.error('发送消息失败:', error)
-    assistantMessage.content = '抱歉，发生了错误，请稍后重试。'
-    const lastIndex = currentMessages.value.length - 1
-    currentMessages.value.splice(lastIndex, 1, { ...assistantMessage })
-  } finally {
-    isStreaming.value = false
+      // 1) 解析成纯文本
+      let chunk = event.data
+      try {
+        chunk = JSON.parse(event.data)
+      } catch (_) {
+        // 非 JSON 字符串，使用原始内容
+      }
 
-    // 移除事件监听器
-    window.removeEventListener('streamData', handleStreamData)
+      // 2) 规范化换行
+      if (typeof chunk !== 'string') chunk = String(chunk)
+      chunk = chunk.replace(/\r\n/g, '\n')
 
-    await scrollToBottom()
-  }
+      // 3) 去掉正文中的行首 data:
+      chunk = chunk.replace(/^data:\s?/gm, '')
+
+      // 4) 累加到响应与占位消息
+      currentResponse.value += chunk
+      const msg = currentMessages.value[assistantIndex]
+      if (msg) {
+        msg.contents += chunk
+      }
+      nextTick(() => scrollToBottom())
+    },
+    onclose() {
+      isStreaming.value = false
+    },
+    onerror(err) {
+      isStreaming.value = false
+      console.error('流式请求出错:', err)
+      throw err
+    }
+  })
 }
 
 // 自动调整输入框高度
-const adjustTextareaHeight = () => {
+async function adjustTextareaHeight() {
   const textarea = inputRef.value
   if (textarea) {
     textarea.style.height = 'auto'
@@ -207,7 +227,7 @@ const adjustTextareaHeight = () => {
 }
 
 // 滚动到底部
-const scrollToBottom = async () => {
+async function scrollToBottom() {
   await nextTick()
   if (messagesRef.value) {
     messagesRef.value.scrollTop = messagesRef.value.scrollHeight
