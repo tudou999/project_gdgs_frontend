@@ -107,13 +107,13 @@ async function startNewChat() {
   chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
 }
 
-// 加载聊天历史
+// 加载聊天历史列表
 async function loadChatHistory() {
   try {
-    const history = await chatAPI.getChatHistory()
-    chatHistory.value = history || []
-    if (history && history.length > 0) {
-      await loadChat(history[0].id)
+    const response = await chatAPI.getChatHistory()
+    chatHistory.value = response.data || []
+    if (response.data && response.data.length > 0) {
+      await loadChat(response.data[0].id)
     } else {
       startNewChat()
     }
@@ -128,7 +128,8 @@ async function loadChatHistory() {
 async function loadChat(chatId) {
   currentChatId.value = chatId
   try {
-    currentMessages.value = await chatAPI.getChatMessages(chatId)
+    const response = await chatAPI.getChatMessages(chatId)
+    currentMessages.value = response.data || []
     await scrollToBottom()
   } catch (error) {
     console.error('加载对话消息失败:', error)
@@ -177,7 +178,9 @@ function startStream(data, sessionId) {
       'Authorization': userStore.token,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ message: prompt }),
+    body: JSON.stringify({
+      message: prompt
+    }),
     onmessage(event) {
       if (!event.data) return
 
