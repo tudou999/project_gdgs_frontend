@@ -1,9 +1,10 @@
 <script setup>
-import { ElMessage } from "element-plus";
-import {ArrowRight, Check, Close, Operation, FolderAdd} from '@element-plus/icons-vue'
-import { ref, watch, computed, nextTick } from "vue";
-import { fileAPI } from "../services/file";
-import { useRoute, useRouter } from 'vue-router';
+import {ElMessage} from "element-plus";
+import {ArrowRight, Check, Close, FolderAdd, Operation} from '@element-plus/icons-vue'
+import {computed, nextTick, ref, watch} from "vue";
+import {fileAPI} from "../services/file";
+import {useRoute, useRouter} from 'vue-router';
+
 defineOptions({ name: "FileController" })
 
 const route = useRoute()
@@ -212,6 +213,7 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
   }
 }
 
+// 删除文件
 async function deleteFile(id) {
   try {
     const responseJson = await fileAPI.deleteDeleteFile(id);
@@ -225,6 +227,24 @@ async function deleteFile(id) {
     console.error('删除失败:', error)
     ElMessage.warning('删除失败！请联系管理员')
   }
+}
+
+// 下载文件
+async function downloadFile(id) {
+  const response = await fileAPI.getDownloadFile(id);
+  const contentDisposition = response.headers.get('Content-Disposition');
+  const fileUrl = URL.createObjectURL(response.data);
+
+  let filename = contentDisposition.match(/filename*?=(?:UTF-8'')?([^;]+)/i);
+  filename = decodeURIComponent(filename[1].replace(/^"|"$/g, ''));
+
+  const link = document.createElement('a');
+  link.href = fileUrl;
+  link.download = filename;
+  link.click();
+
+  ElMessage.success('开始下载！')
+  URL.revokeObjectURL(fileUrl);
 }
 </script>
 
@@ -305,7 +325,7 @@ async function deleteFile(id) {
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>下载</el-dropdown-item>
+                <el-dropdown-item @click="downloadFile(file.id)">下载</el-dropdown-item>
                 <el-dropdown-item @click="clickRenameButton(file)">重命名</el-dropdown-item>
                 <el-dropdown-item class="my-class">
                   <el-popconfirm
