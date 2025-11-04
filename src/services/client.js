@@ -1,9 +1,25 @@
 import axios from 'axios';
-import { useUserStore } from "../stores/user";
-import {ElMessage} from "element-plus";
+import { useUserStore } from '../stores/user';
+import { ElMessage } from 'element-plus';
 
 const BASE_URL = 'http://localhost/api/v1';
 
+// 添加 token
+const addAuthHeader = (config) => {
+  const { token } = useUserStore();
+  if (token) config.headers.Authorization = token;
+  return config;
+};
+
+// 统一错误处理
+const handleResponseError = (error) => {
+  if (error.response?.status !== 200) {
+    ElMessage.warning('网络错误！请联系管理员');
+  }
+  return Promise.reject(error);
+};
+
+// data客户端
 const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -11,23 +27,20 @@ const apiClient = axios.create({
   }
 });
 
-// 请求拦截器，添加认证token
-apiClient.interceptors.request.use(
-    (config) => {
-      const { token } = useUserStore();
-      if (token) config.headers.Authorization = token;
-      return config;
-    },
-    (error) => Promise.reject(error)
-);
+// 原始客户端
+const rawApiClient = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
 
-// 响应拦截器：统一错误处理
-apiClient.interceptors.response.use(
-    response => response.data,
-    error => {
-      if (error.response?.status !== 200) ElMessage.warning('网络错误！请联系管理员')
-      return Promise.reject(error);
-    }
-);
+// 请求拦截器
+apiClient.interceptors.request.use(addAuthHeader, handleResponseError);
+rawApiClient.interceptors.request.use(addAuthHeader, handleResponseError);
 
-export default apiClient;
+// 响应拦截器
+apiClient.interceptors.response.use((res) => res.data, handleResponseError);
+rawApiClient.interceptors.response.use((res) => res, handleResponseError);
+
+export { apiClient, rawApiClient };
