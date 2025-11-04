@@ -1,6 +1,6 @@
 import { useUserStore } from '../stores/user'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import apiClient from './client';
+import { apiClient } from './client';
 
 const userStore = useUserStore()
 

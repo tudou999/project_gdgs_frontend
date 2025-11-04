@@ -1,5 +1,5 @@
 import { useUserStore } from '../stores/user'
-import apiClient from './client';
+import { apiClient } from './client';
 
 export const SignAPI = {
 

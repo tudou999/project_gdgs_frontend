@@ -33,16 +33,6 @@ const routes = [
     component: lazyLoad('CustomerService')
   },
   {
-    path: '/chat-pdf',
-    name: 'ChatPDF',
-    component: lazyLoad('ChatPDF')
-  },
-  {
-    path: '/game',
-    name: 'Game',
-    component: lazyLoad('GameChat')
-  },
-  {
     path: '/login',
     name: 'Login',
     component: lazyLoad('Login')
