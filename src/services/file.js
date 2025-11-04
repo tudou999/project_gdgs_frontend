@@ -1,4 +1,4 @@
-import apiClient from './client';
+import { apiClient, rawApiClient } from './client';
 
 export const fileAPI = {
   // 获取文件列表
@@ -34,5 +34,15 @@ export const fileAPI = {
   // 删除文件/文件夹
   deleteDeleteFile(id) {
     return apiClient.delete(`/file/${id}`);
+  },
+
+  // 下载文件
+  getDownloadFile(id) {
+    return rawApiClient.get('/file/download', {
+      params:{
+        id: id
+      },
+      responseType: 'blob'
+    })
   }
 };
