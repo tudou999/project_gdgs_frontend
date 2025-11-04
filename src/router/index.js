@@ -59,8 +59,8 @@ const routes = [
   },
   {
     path: '/file',
-    name: 'FileController',
-    component: lazyLoad('FileController')
+    name: 'FileSystem',
+    component: lazyLoad('FileSystem')
   }
 ]
 
