@@ -24,7 +24,34 @@
             @click="loadChat(chat.id)"
           >
             <ChatBubbleLeftRightIcon class="icon" />
-            <span class="title">{{ chat.title || '新对话' }}</span>
+
+            <span v-if="chat.editing === 0" class="title">
+              {{ chat.title || '新对话' }}
+            </span>
+
+            <el-input v-else
+                      v-model="chat.title"
+                      size="default"
+                      placeholder="请输入新标题"
+                      clearable/>
+
+            <el-dropdown trigger="click"
+                         :hide-on-click="false"
+                         size="large">
+              <el-button>
+                <el-icon>
+                  <More />
+                </el-icon>
+              </el-button>
+
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="renameSession(chat)">重命名会话</el-dropdown-item>
+                  <el-dropdown-item @click="deleteSession(chat.id, chat.title)">删除会话</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+
+            </el-dropdown>
           </div>
         </div>
       </el-aside>
@@ -65,7 +92,7 @@
 </template>
 
 <script setup>
-import {ChatDotSquare} from "@element-plus/icons-vue";
+import {ChatDotSquare, More} from "@element-plus/icons-vue";
 
 defineOptions ({
   name: 'AIChat'
@@ -77,9 +104,10 @@ import {
   PaperAirplaneIcon,
 } from '@heroicons/vue/24/outline'
 import ChatMessage from '../components/ChatMessage.vue'
-import {chatAPI} from '../services/api'
+import {chatAPI} from '../services/chat.js'
 import {fetchEventSource} from "@microsoft/fetch-event-source";
 import { useUserStore } from '../stores/user'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const messagesRef = ref(null)
 const inputRef = ref(null)
@@ -95,23 +123,57 @@ const currentResponse = ref('')
 const userStore = useUserStore()
 // 开始新对话
 async function startNewChat() {
-  const newChatId = Date.now().toString()
-  currentChatId.value = newChatId
-  currentMessages.value = []
 
-  // 添加新对话到聊天历史列表
-  const newChat = {
-    id: newChatId,
-    title: `对话 ${newChatId.slice(-6)}`
-  }
-  chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
+}
+
+// 重命名会话
+async function renameSession(data) {
+
+}
+
+// 删除会话
+async function deleteSession(id, name) {
+  ElMessageBox.confirm(
+      `确认删除 ${name} 吗？`,
+      'warning',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+  )
+      .then(() => {
+        const response = chatAPI.deleteDeleteSession(id)
+        if (response.code === 200) {
+          ElMessage({
+            type: 'success',
+            message: `删除 ${name} 成功！`,
+          })
+        }
+        else {
+          ElMessage({
+            type: 'error',
+            message: `删除 ${name} 失败！请联系管理员。`,
+          })
+        }
+        loadChatHistory()
+      })
+      .catch(() => {
+        ElMessage({
+          type: 'info',
+          message: '已取消删除',
+        })
+      })
 }
 
 // 加载聊天历史列表
 async function loadChatHistory() {
   try {
     const response = await chatAPI.getChatHistory()
-    chatHistory.value = response.data || []
+    chatHistory.value = response.data.map(item => ({
+      ...item,
+      editing: 0
+    }))
     if (response.data && response.data.length > 0) {
       await loadChat(response.data[0].id)
     } else {
@@ -315,6 +377,7 @@ onMounted(() => {
       padding: 0 1rem 1rem;
       
       .history-item {
+        max-height: 48px;
         display: flex;
         align-items: center;
         gap: 0.5rem;
