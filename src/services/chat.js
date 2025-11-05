@@ -30,6 +30,10 @@ export const chatAPI = {
     return apiClient.get('/session');
   },
 
+  postCreateSession() {
+    return apiClient.post('/session');
+  },
+
   // 获取对话聊天记录
   getChatMessages(chatId) {  // 添加类型参数
     return apiClient.get(`/message/session/${chatId}`);
