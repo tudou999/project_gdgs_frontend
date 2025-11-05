@@ -30,6 +30,21 @@ export const chatAPI = {
     return apiClient.get('/session');
   },
 
+  // 创建新的聊天会话
+  postCreateSession() {
+    return apiClient.post('/session');
+  },
+
+  // 重命名聊天会话
+  putRenameSession(chatId, name) {
+    return apiClient.put(`/session`, {
+      param: {
+        id: chatId,
+        title: name
+      }
+    });
+  },
+
   // 删除聊天会话
   deleteDeleteSession(chatId) {
     return apiClient.delete(`/session/${chatId}`);

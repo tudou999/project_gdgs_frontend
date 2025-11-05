@@ -33,25 +33,29 @@
                       v-model="chat.title"
                       size="default"
                       placeholder="请输入新标题"
-                      clearable/>
+                      clearable
+                      @keydown.enter.stop.prevent="confirmRename(chat)"
+                      :disabled="renamingId && renamingId !== chat.id"
+                      v-click-outside="cancelAllEditing"/>
 
-            <el-dropdown trigger="click"
-                         :hide-on-click="false"
-                         size="large">
-              <el-button>
-                <el-icon>
-                  <More />
-                </el-icon>
-              </el-button>
+            <span class="actions">
+              <el-dropdown size="large"
+                           trigger="click">
+                <el-button :disabled="isAnyEditing && chat.editing === 0">
+                  <el-icon>
+                    <More />
+                  </el-icon>
+                </el-button>
 
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="renameSession(chat)">重命名会话</el-dropdown-item>
-                  <el-dropdown-item @click="deleteSession(chat.id, chat.title)">删除会话</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item @click="renameSession(chat)">重命名会话</el-dropdown-item>
+                    <el-dropdown-item @click="deleteSession(chat.id, chat.title)">删除会话</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
 
-            </el-dropdown>
+              </el-dropdown>
+            </span>
           </div>
         </div>
       </el-aside>
@@ -98,7 +102,8 @@ defineOptions ({
   name: 'AIChat'
 })
 
-import {nextTick, onMounted, ref} from 'vue'
+import {nextTick, onMounted, ref, computed} from 'vue'
+import { ClickOutside as vClickOutside } from 'element-plus'
 import {
   ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
@@ -119,16 +124,70 @@ const chatHistory = ref([])
 
 // 当前 AI 正在生成的回复
 const currentResponse = ref('')
+// 取消全部编辑态（防止提交中误取消）
+function cancelAllEditing() {
+  if (renamingId.value) return
+  if (Array.isArray(chatHistory.value)) {
+    chatHistory.value.forEach(c => { c.editing = 0 })
+  }
+}
+
 
 const userStore = useUserStore()
 // 开始新对话
 async function startNewChat() {
-
+  // const newChatId = Date.now().toString()
+  // currentChatId.value = newChatId
+  // currentMessages.value = []
+  //
+  // // 添加新对话到聊天历史列表
+  // const newChat = {
+  //   id: newChatId,
+  //   title: `对话 ${newChatId.slice(-6)}`
+  // }
+  // chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
+  const response = await chatAPI.postCreateSession()
+  console.log("🚀🚀🚀🚀", response)
 }
 
-// 重命名会话
-async function renameSession(data) {
+// 是否存在任一项处于编辑态
+const isAnyEditing = computed(() =>
+  Array.isArray(chatHistory.value) && chatHistory.value.some(c => c.editing !== 0)
+)
 
+// 正在提交重命名的会话ID（防重复提交）
+const renamingId = ref(null)
+
+// 进入重命名（仅允许单例编辑）
+async function renameSession(data) {
+  if (Array.isArray(chatHistory.value)) {
+    chatHistory.value.forEach(c => { c.editing = 0 })
+  }
+  data.editing = 1
+  await nextTick();
+  const inputEl = document.querySelector('.history-item.active .el-input__inner') || document.querySelector('.history-item .el-input__inner');
+  if (inputEl) {
+    inputEl.focus();
+  }
+}
+
+// 确认提交重命名
+async function confirmRename(chat) {
+  if (!chat || renamingId.value) return
+  renamingId.value = chat.id
+  try {
+    const response = await chatAPI.putRenameSession(chat.title || '', chat.id)
+    if (response?.code === 200) {
+      chat.editing = 0
+      ElMessage.success('重命名成功！')
+    } else {
+      ElMessage.error(`重命名失败：${response?.msg || '未知错误'}`)
+    }
+  } catch (e) {
+    ElMessage.error('重命名失败：网络或服务器异常')
+  } finally {
+    renamingId.value = null
+  }
 }
 
 // 删除会话
@@ -405,6 +464,18 @@ onMounted(() => {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+
+          .actions {
+            margin-left: auto;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease;
+          }
+
+          &:hover .actions {
+            opacity: 1;
+            visibility: visible;
+          }
       }
     }
   }
