@@ -13,6 +13,13 @@ const router = useRouter()
 const fileList = ref([])
 const breadcrumbTrail = ref([{ id: null, name: '全部文件' }])
 const existingNew = ref(false)
+// 处于重命名状态的文件 ID
+const renamingId = ref(null);
+
+// 是否有文件处于编辑状态
+const isAnyEditing = computed(() =>
+    Array.isArray(fileList.value) && fileList.value.some(f => f.editing !== 0)
+);
 
 // 当前路径的 ID 数组（从根到当前文件夹）
 const currentPathIds = computed(() => {
@@ -181,6 +188,11 @@ async function reloadContent() {
 
 // 点击重命名文件按钮
 async function clickRenameButton(file) {
+  // 清空其他项的编辑态
+  if (Array.isArray(fileList.value)) {
+    fileList.value.forEach(f => { f.editing = 0; });
+  }
+
   file.editing = 2;
   await nextTick();
   const inputEl = document.querySelector('.file-item .name-input input');
@@ -202,13 +214,18 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
       ElMessage.error('创建失败：', responseJson.msg)
     }
   } else if (editing === 2) {
+    if (renamingId.value) return;
+    renamingId.value = checkedId;
     const responseJson = await fileAPI.putRenameFile(checkedId, name);
-    if (responseJson.code === 200) {
-      await reloadContent()
-      ElMessage.success('重命名成功！')
-    }
-    else {
-      ElMessage.error('重命名失败：', responseJson.msg)
+    try {
+      if (responseJson.code === 200) {
+        await reloadContent()
+        ElMessage.success('重命名成功！')
+      } else {
+        ElMessage.error('重命名失败：', responseJson.msg)
+      }
+    } finally {
+      renamingId.value = null;
     }
   }
 }
@@ -288,7 +305,9 @@ async function downloadFile(id) {
           <el-button
               type="primary"
               @click="checkOrRename(file.editing, currentFolderId, file.id, file.name)"
-              size="small">
+              size="small"
+              :loading="renamingId === file.id"
+              :disabled="renamingId && renamingId !== file.id">
             <el-icon><Check /></el-icon>
           </el-button>
           <el-button @click="reloadContent()" size="small">
@@ -319,7 +338,7 @@ async function downloadFile(id) {
               trigger="click"
               size="large"
               :hide-on-click="false">
-            <el-button size="large">
+            <el-button size="large" :disabled="isAnyEditing && file.editing === 0">
               菜单
               <el-icon class="el-icon--right" size="large"><Operation /></el-icon>
             </el-button>
