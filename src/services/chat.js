@@ -30,8 +30,9 @@ export const chatAPI = {
     return apiClient.get('/session');
   },
 
-  postCreateSession() {
-    return apiClient.post('/session');
+  // 删除聊天会话
+  deleteDeleteSession(chatId) {
+    return apiClient.delete(`/session/${chatId}`);
   },
 
   // 获取对话聊天记录
