@@ -372,7 +372,7 @@ onMounted(() => {
   right: 0;
   bottom: 0;
   display: flex;
-  background: var(--bg-color);
+  background: var(--el-bg-color);
   overflow: hidden; // 防止页面滚动
 
   .chat-container {
@@ -391,7 +391,7 @@ onMounted(() => {
     width: 300px;
     display: flex;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--el-bg-color-overlay);
     backdrop-filter: blur(10px);
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
@@ -413,14 +413,14 @@ onMounted(() => {
         gap: 0.5rem;
         padding: 0.5rem 1rem;
         border-radius: 0.5rem;
-        background: #007CF0;
-        color: white;
+        background: var(--el-color-primary);
+        color: var(--el-color-white, #fff);
         border: none;
         cursor: pointer;
         transition: background-color 0.3s;
         
         &:hover {
-          background: #0066cc;
+          background: var(--el-color-primary-dark-2);
         }
         
         .icon {
@@ -446,11 +446,11 @@ onMounted(() => {
         transition: background-color 0.3s;
         
         &:hover {
-          background: rgba(255, 255, 255, 0.1);
+          background: var(--el-fill-color);
         }
         
         &.active {
-          background: rgba(0, 124, 240, 0.1);
+          background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
         }
         
         .icon {
@@ -484,7 +484,7 @@ onMounted(() => {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--el-bg-color-overlay);
     backdrop-filter: blur(10px);
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
@@ -494,32 +494,51 @@ onMounted(() => {
       flex: 1;
       overflow-y: auto;  // 只允许消息区域滚动
       padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+
+      /* 美化滚动条，随主题变化 */
+      &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: var(--el-border-color);
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb:hover {
+        background: var(--el-border-color-dark);
+      }
     }
     
     .input-area {
       flex-shrink: 0;
       padding: 1.5rem 2rem;
-      background: rgba(255, 255, 255, 0.98);
-      border-top: 1px solid rgba(0, 0, 0, 0.05);
+      background: var(--el-bg-color-overlay);
+      border-top: 1px solid var(--el-border-color);
       display: flex;
       flex-direction: column;
       gap: 1rem;
 
       .selected-files {
-        background: rgba(0, 0, 0, 0.02);
+        background: var(--el-fill-color-light);
         border-radius: 0.75rem;
         padding: 0.75rem;
-        border: 1px solid rgba(0, 0, 0, 0.05);
+        border: 1px solid var(--el-border-color);
         
         .file-item {
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 0.75rem;
-          background: #fff;
+          background: var(--el-bg-color);
           border-radius: 0.5rem;
           margin-bottom: 0.75rem;
-          border: 1px solid rgba(0, 0, 0, 0.05);
+          border: 1px solid var(--el-border-color);
           transition: all 0.2s ease;
           
           &:last-child {
@@ -527,8 +546,8 @@ onMounted(() => {
           }
           
           &:hover {
-            background: rgba(0, 124, 240, 0.02);
-            border-color: rgba(0, 124, 240, 0.2);
+            background: color-mix(in srgb, var(--el-color-primary) 3%, transparent);
+            border-color: color-mix(in srgb, var(--el-color-primary) 20%, var(--el-border-color));
           }
           
           .file-info {
@@ -539,19 +558,19 @@ onMounted(() => {
             .icon {
               width: 1.5rem;
               height: 1.5rem;
-              color: #007CF0;
+              color: var(--el-color-primary);
             }
             
             .file-name {
               font-size: 0.875rem;
-              color: #333;
+              color: var(--el-text-color-primary);
               font-weight: 500;
             }
             
             .file-size {
               font-size: 0.75rem;
-              color: #666;
-              background: rgba(0, 0, 0, 0.05);
+              color: var(--el-text-color-secondary);
+              background: var(--el-fill-color-light);
               padding: 0.25rem 0.5rem;
               border-radius: 1rem;
             }
@@ -560,15 +579,15 @@ onMounted(() => {
           .remove-btn {
             padding: 0.375rem;
             border: none;
-            background: rgba(0, 0, 0, 0.05);
-            color: #666;
+            background: var(--el-fill-color-light);
+            color: var(--el-text-color-secondary);
             cursor: pointer;
             border-radius: 0.375rem;
             transition: all 0.2s ease;
             
             &:hover {
-              background: #ff4d4f;
-              color: #fff;
+              background: var(--el-color-danger);
+              color: var(--el-color-white, #fff);
             }
             
             .icon {
@@ -583,10 +602,10 @@ onMounted(() => {
         display: flex;
         gap: 1rem;
         align-items: flex-end;
-        background: #fff;
+        background: var(--el-bg-color);
         padding: 0.75rem;
         border-radius: 1rem;
-        border: 1px solid rgba(0, 0, 0, 0.1);
+        border: 1px solid var(--el-border-color);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
         .file-upload {
@@ -602,13 +621,13 @@ onMounted(() => {
             justify-content: center;
             border: none;
             border-radius: 0.75rem;
-            background: rgba(0, 124, 240, 0.1);
-            color: #007CF0;
+            background: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+            color: var(--el-color-primary);
             cursor: pointer;
             transition: all 0.2s ease;
             
             &:hover:not(:disabled) {
-              background: rgba(0, 124, 240, 0.2);
+              background: color-mix(in srgb, var(--el-color-primary) 20%, transparent);
             }
             
             &:disabled {
@@ -640,7 +659,7 @@ onMounted(() => {
           }
           
           &::placeholder {
-            color: #999;
+            color: var(--el-text-color-placeholder);
           }
         }
         
@@ -652,18 +671,18 @@ onMounted(() => {
           justify-content: center;
           border: none;
           border-radius: 0.75rem;
-          background: #007CF0;
-          color: white;
+          background: var(--el-color-primary);
+          color: var(--el-color-white, #fff);
           cursor: pointer;
           transition: all 0.2s ease;
           
           &:hover:not(:disabled) {
-            background: #0066cc;
+            background: var(--el-color-primary-dark-2);
             transform: translateY(-1px);
           }
           
           &:disabled {
-            background: #ccc;
+            background: var(--el-border-color);
             cursor: not-allowed;
           }
           

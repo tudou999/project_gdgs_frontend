@@ -266,9 +266,36 @@ const formatTime = (timestamp) => {
         position: relative;
         
         .text {
-          background: #f0f7ff; // 浅色背景
-          color: #333;
+          background: var(--el-color-primary-light-9);
+          color: var(--el-text-color-primary);
           border-radius: 1rem 1rem 0 1rem;
+          border: 2px solid var(--el-border-color);
+          position: relative;
+        }
+
+        /* 用户气泡尾巴（右侧） */
+        .text::after {
+          content: '';
+          position: absolute;
+          right: -6px;
+          bottom: 0.4rem;
+          width: 0;
+          height: 0;
+          border-left: 6px solid var(--el-border-color);
+          border-top: 6px solid transparent;
+          border-bottom: 6px solid transparent;
+        }
+
+        .text::before {
+          content: '';
+          position: absolute;
+          right: -4px;
+          bottom: 0.45rem;
+          width: 0;
+          height: 0;
+          border-left: 6px solid var(--el-color-primary-light-9);
+          border-top: 6px solid transparent;
+          border-bottom: 6px solid transparent;
         }
         
         .user-copy-button {
@@ -290,7 +317,7 @@ const formatTime = (timestamp) => {
           .copy-icon {
             width: 16px;
             height: 16px;
-            color: #666;
+            color: var(--el-text-color-secondary);
             
             &.copied {
               color: #4ade80;
@@ -317,17 +344,17 @@ const formatTime = (timestamp) => {
     .icon {
       width: 100%;
       height: 100%;
-      color: #666;
+      color: var(--el-text-color-secondary);
       padding: 4px;
       border-radius: 8px;
       transition: all 0.3s ease;
 
       &.assistant {
-        color: #333;
-        background: #f0f0f0;
+        color: var(--el-text-color-primary);
+        background: var(--el-fill-color);
 
         &:hover {
-          background: #e0e0e0;
+          background: var(--el-fill-color-dark);
           transform: scale(1.05);
         }
       }
@@ -337,7 +364,7 @@ const formatTime = (timestamp) => {
   .content {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.5rem;
     max-width: 80%;
     
     .text-container {
@@ -351,7 +378,7 @@ const formatTime = (timestamp) => {
       
       .time {
         font-size: 0.75rem;
-        color: #666;
+        color: var(--el-text-color-secondary);
       }
       
       .copy-button {
@@ -361,7 +388,7 @@ const formatTime = (timestamp) => {
         background: transparent;
         border: none;
         font-size: 0.75rem;
-        color: #666;
+        color: var(--el-text-color-secondary);
         padding: 0.25rem 0.5rem;
         border-radius: 4px;
         cursor: pointer;
@@ -369,7 +396,7 @@ const formatTime = (timestamp) => {
         transition: background-color 0.2s;
         
         &:hover {
-          background-color: rgba(0, 0, 0, 0.05);
+          background-color: var(--el-fill-color-light);
         }
         
         .copy-icon {
@@ -392,7 +419,10 @@ const formatTime = (timestamp) => {
       border-radius: 1rem 1rem 1rem 0;
       line-height: 1.5;
       white-space: pre-wrap;
-      color: var(--text-color);
+      color: var(--el-text-color-primary);
+      background: var(--el-bg-color-overlay);
+      border: 2px solid var(--el-border-color);
+      position: relative;
 
       .cursor {
         animation: blink 1s infinite;
@@ -400,7 +430,7 @@ const formatTime = (timestamp) => {
 
       .typing-cursor {
         animation: blink 1s infinite;
-        color: #007CF0;
+        color: var(--el-color-primary);
         font-weight: bold;
         margin-left: 2px;
       }
@@ -409,10 +439,10 @@ const formatTime = (timestamp) => {
         position: relative;
         padding: 0.75rem 1rem 0.75rem 1.5rem;
         margin: 0.5rem 0;
-        color: #666;
+        color: var(--el-text-color-secondary);
         font-style: italic;
-        border-left: 4px solid #ddd;
-        background-color: rgba(0, 0, 0, 0.03);
+        border-left: 4px solid var(--el-border-color);
+        background-color: var(--el-fill-color-light);
         border-radius: 0 0.5rem 0.5rem 0;
 
         // 添加平滑过渡效果
@@ -427,9 +457,9 @@ const formatTime = (timestamp) => {
           left: 1rem;
           padding: 0 0.5rem;
           font-size: 0.75rem;
-          background: #f5f5f5;
+          background: var(--el-fill-color);
           border-radius: 0.25rem;
-          color: #999;
+          color: var(--el-text-color-placeholder);
           font-style: normal;
         }
 
@@ -440,12 +470,12 @@ const formatTime = (timestamp) => {
       }
 
       :deep(pre) {
-        background: #f6f8fa;
+        background: var(--el-fill-color-light);
         padding: 1rem;
         border-radius: 0.5rem;
         overflow-x: auto;
         margin: 0.5rem 0;
-        border: 1px solid #e1e4e8;
+        border: 2px solid var(--el-border-color);
 
         code {
           background: transparent;
@@ -458,7 +488,7 @@ const formatTime = (timestamp) => {
       }
 
       :deep(.hljs) {
-        color: #24292e;
+        color: var(--el-text-color-primary);
         background: transparent;
       }
 
@@ -572,11 +602,11 @@ const formatTime = (timestamp) => {
   .message {
     .avatar .icon {
       &.assistant {
-        color: #fff;
-        background: #444;
+        color: var(--el-text-color-primary);
+        background: var(--el-fill-color-dark);
 
         &:hover {
-          background: #555;
+          background: var(--el-fill-color-darker);
         }
       }
     }
@@ -584,8 +614,9 @@ const formatTime = (timestamp) => {
     &.message-user {
       .content .text-container {
         .text {
-          background: #1a365d; // 暗色模式下的浅蓝色背景
-          color: #fff;
+          background: var(--el-color-primary-dark-2);
+          color: var(--el-text-color-primary);
+          border: 2px solid var(--el-border-color);
         }
         
         .user-copy-button {
@@ -603,33 +634,33 @@ const formatTime = (timestamp) => {
     .content {
       .message-footer {
         .time {
-          color: #999;
+          color: var(--el-text-color-regular);
         }
         
         .copy-button {
-          color: #999;
+          color: var(--el-text-color-regular);
           
           &:hover {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: var(--el-fill-color);
           }
         }
       }
 
       .text {
         :deep(.think-block) {
-          background-color: rgba(255, 255, 255, 0.03);
-          border-left-color: #666;
-          color: #999;
+          background-color: var(--el-fill-color);
+          border-left-color: var(--el-border-color);
+          color: var(--el-text-color-regular);
 
           &::before {
-            background: #2a2a2a;
-            color: #888;
+            background: var(--el-fill-color-dark);
+            color: var(--el-text-color-secondary);
           }
         }
 
         :deep(pre) {
-          background: #161b22;
-          border-color: #30363d;
+          background: var(--el-fill-color-dark);
+          border-color: var(--el-border-color);
 
           code {
             color: #c9d1d9;
@@ -670,7 +701,7 @@ const formatTime = (timestamp) => {
         }
 
         :deep(.hljs-subst) {
-          color: #c9d1d9;
+          color: var(--el-text-color-primary);
         }
 
         :deep(.hljs-symbol) {
@@ -756,7 +787,7 @@ const formatTime = (timestamp) => {
   }
 
   :deep(code) {
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--el-fill-color-light);
     padding: 0.2em 0.4em;
     border-radius: 3px;
     font-size: 0.9em;
@@ -776,20 +807,20 @@ const formatTime = (timestamp) => {
 
   :deep(th),
   :deep(td) {
-    border: 1px solid #ddd;
+    border: 1px solid var(--el-border-color);
     padding: 0.5rem;
     text-align: left;
   }
 
   :deep(th) {
-    background: rgba(0, 0, 0, 0.05);
+    background: var(--el-fill-color-light);
   }
 
   :deep(blockquote) {
     margin: 0.5rem 0;
     padding-left: 1rem;
-    border-left: 4px solid #ddd;
-    color: #666;
+    border-left: 4px solid var(--el-border-color);
+    color: var(--el-text-color-secondary);
   }
 
   :deep(.code-block-wrapper) {
@@ -802,7 +833,7 @@ const formatTime = (timestamp) => {
       position: absolute;
       top: 0.5rem;
       right: 0.5rem;
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--el-fill-color);
       border: none;
       color: #e6e6e6;
       cursor: pointer;
@@ -816,7 +847,7 @@ const formatTime = (timestamp) => {
       z-index: 10;
       
       &:hover {
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: var(--el-fill-color-dark);
       }
       
       .code-copy-icon {
@@ -832,7 +863,7 @@ const formatTime = (timestamp) => {
     pre {
       margin: 0;
       padding: 1rem;
-      background: #1e1e1e;
+      background: var(--el-fill-color-dark);
       overflow-x: auto;
       
       code {
@@ -846,8 +877,8 @@ const formatTime = (timestamp) => {
       position: absolute;
       top: 0.5rem;
       right: 0.5rem;
-      background: rgba(74, 222, 128, 0.9);
-      color: white;
+      background: var(--el-color-success);
+      color: var(--el-color-white, #fff);
       padding: 0.25rem 0.5rem;
       border-radius: 4px;
       font-size: 0.75rem;
@@ -869,34 +900,34 @@ const formatTime = (timestamp) => {
   .markdown-content {
     :deep(.code-block-wrapper) {
       .code-copy-button {
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--el-fill-color);
         
         &:hover {
-          background-color: rgba(255, 255, 255, 0.1);
+          background-color: var(--el-fill-color-dark);
         }
       }
       
       pre {
-        background: #0d0d0d;
+        background: var(--el-fill-color-darker);
       }
     }
     
     :deep(code) {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--el-fill-color);
     }
 
     :deep(th),
     :deep(td) {
-      border-color: #444;
+      border-color: var(--el-border-color);
     }
 
     :deep(th) {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--el-fill-color);
     }
 
     :deep(blockquote) {
-      border-left-color: #444;
-      color: #999;
+      border-left-color: var(--el-border-color);
+      color: var(--el-text-color-regular);
     }
   }
 }
