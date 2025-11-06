@@ -85,7 +85,7 @@ import {
   ComputerDesktopIcon
 } from '@heroicons/vue/24/outline'
 import ChatMessage from '../components/ChatMessage.vue'
-import { chatAPI } from '../services/api'
+import { chatAPI } from '../services/chat.js'
 
 const isDark = useDark()
 const messagesRef = ref(null)
