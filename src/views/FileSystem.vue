@@ -52,7 +52,7 @@ async function loadContent() {
     const trail = [{ id: null, name: '全部文件' }]
     for (const id of currentPathIds.value) {
       const responseJson = await fileAPI.getInformation(id)
-      if (responseJson.code !== 200) {
+      if (responseJson.code === 200) {
         const info = responseJson.data
         trail.push({ id: id, name: info.name })
       }
@@ -377,13 +377,22 @@ async function downloadFile(id) {
   padding: 10px 16px;
   margin-bottom: 8px;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  transition: background-color 0.2s ease;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
 }
 
 .file-item:hover {
-  background-color: #a9c8ff;
+  background: color-mix(in srgb, var(--el-color-primary) 6%, transparent);
+  border-color: color-mix(in srgb, var(--el-color-primary) 25%, var(--el-border-color));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.file-item:active {
+  transform: translateY(0);
 }
 
 .el-breadcrumb {
@@ -399,7 +408,7 @@ async function downloadFile(id) {
         cursor: pointer;
 
         &:hover {
-          text-decoration: underline;
+          color: var(--el-color-primary);
         }
       }
 
@@ -411,6 +420,7 @@ async function downloadFile(id) {
 
     .el-breadcrumb__separator {
       margin: 0 8px;
+      color: var(--el-text-color-secondary);
     }
   }
 }
@@ -420,8 +430,10 @@ async function downloadFile(id) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--el-border-color);
   border-radius: 8px;
+  padding: 10px 16px;
   min-height: 50px;
 }
 
@@ -434,6 +446,12 @@ async function downloadFile(id) {
   width: 200px;
   min-height: 28px;
   margin-right: 16px;
+  :deep(input::placeholder) {
+    color: var(--el-text-color-placeholder);
+  }
+  :deep(.el-input__wrapper) {
+    background: var(--el-bg-color);
+  }
 }
 
 .file-item-editing {
@@ -441,6 +459,10 @@ async function downloadFile(id) {
   align-items: center;
   width: 100%;
   min-height: 40px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: 8px;
+  padding: 8px 10px;
 }
 
 .file-item-normal {
@@ -450,9 +472,44 @@ async function downloadFile(id) {
   width: 100%;
 }
 
+.file-name {
+  color: var(--el-text-color-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .action-button {
   flex-shrink: 0;
   margin-left: 12px;
+}
+
+/* 编辑状态按钮间距与尺寸优化 */
+.file-item-editing :deep(.el-button) {
+  margin-left: 6px;
+}
+
+/* 文件/文件夹图标伪元素（无需改模板） */
+.file-item-normal .folder-link::before {
+  content: '📁';
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.file-item-normal .file-name:not(.folder-link)::before {
+  content: '📄';
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.file-item-normal .folder-link {
+  color: var(--el-color-primary);
+  font-weight: 600;
+}
+
+.file-item-normal .folder-link:hover {
+  text-decoration: underline;
 }
 
 .dropdown-item-delete-fullSpan {
