@@ -4,7 +4,7 @@ import { useDark, useToggle } from '@vueuse/core'
 import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
-import { User, SwitchButton } from "@element-plus/icons-vue";
+import {User, SwitchButton, Back, House} from "@element-plus/icons-vue";
 import { useUserStore } from './stores/user'
 
 const isDark = useDark()
@@ -17,6 +17,15 @@ const currentRoute = ref(router.currentRoute.value.path)
 
 // 登录状态管理
 const isLoggedIn = ref(false)
+// 是否显示返回首页按钮（首页/登录/注册页不显示）
+const showBack = computed(() => {
+  const hidden = ['/home', '/login', '/register']
+  return !hidden.includes(currentRoute.value)
+})
+
+const handleGoHome = () => {
+  router.push('/home')
+}
 
 // 检查登录状态
 const checkLoginStatus = () => {
@@ -74,7 +83,22 @@ router.beforeEach((to, from, next) => {
 <template>
   <div class="app" :class="{ 'dark': isDark }">
     <nav class="navbar">
-      <router-link to="/home" class="logo">CORS智能助手</router-link>
+      <div class="navbar-left">
+        <router-link to="/home" class="logo">CORS智能助手</router-link>
+        <el-button
+            plain
+            style="margin-left: 10px"
+            type="primary"
+            size="default"
+            v-if="showBack"
+            @click="handleGoHome"
+            title="返回首页"
+        >
+          <el-icon style="vertical-align: middle">
+            <House />
+          </el-icon>
+        </el-button>
+      </div>
       <div class="navbar-actions">
         <button @click="toggleDark()" class="theme-toggle">
           <SunIcon v-if="isDark" class="icon" />
@@ -171,6 +195,12 @@ body {
     background: #007CF0;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+
+  .navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .navbar-actions {
