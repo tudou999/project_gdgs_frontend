@@ -21,7 +21,7 @@
             :key="chat.id"
             class="history-item"
             :class="{ 'active': currentChatId === chat.id }"
-            @click="loadChat(chat.id)"
+            @click="chat.editing === 0 ? loadChat(chat.id) : null"
           >
             <ChatBubbleLeftRightIcon class="icon" />
 
@@ -29,14 +29,35 @@
               {{ chat.title || '新对话' }}
             </span>
 
-            <el-input v-else
-                      v-model="chat.title"
-                      size="default"
-                      placeholder="请输入新标题"
-                      clearable
-                      @keydown.enter.stop.prevent="confirmRename(chat)"
-                      :disabled="renamingId && renamingId !== chat.id"
-                      v-click-outside="cancelAllEditing"/>
+            <div v-else class="rename-editing">
+              <el-input
+                v-model="chat.title"
+                size="default"
+                placeholder="请输入新标题"
+                clearable
+                @keydown.enter.stop.prevent="confirmRename(chat)"
+                :disabled="renamingId && renamingId !== chat.id"
+                class="rename-input"
+              />
+              <el-button
+                type="primary"
+                size="small"
+                @click="confirmRename(chat)"
+                :loading="renamingId === chat.id"
+                :disabled="renamingId && renamingId !== chat.id"
+                class="rename-confirm-btn"
+              >
+                <el-icon><Check /></el-icon>
+              </el-button>
+              <el-button
+                size="small"
+                @click="cancelRename(chat)"
+                :disabled="renamingId && renamingId !== chat.id"
+                class="rename-cancel-btn"
+              >
+                <el-icon><Close /></el-icon>
+              </el-button>
+            </div>
 
             <span class="actions">
               <el-dropdown size="large"
@@ -98,17 +119,15 @@
 </template>
 
 <script setup>
-import {ChatDotSquare, More, Position} from "@element-plus/icons-vue";
+import {ChatDotSquare, More, Position, Check, Close} from "@element-plus/icons-vue";
 
 defineOptions ({
   name: 'AIChat'
 })
 
 import {nextTick, onMounted, ref, computed} from 'vue'
-import { ClickOutside as vClickOutside } from 'element-plus'
 import {
   ChatBubbleLeftRightIcon,
-  PaperAirplaneIcon,
 } from '@heroicons/vue/24/outline'
 import ChatMessage from '../components/ChatMessage.vue'
 import {chatAPI} from '../services/chat.js'
@@ -126,16 +145,9 @@ const chatHistory = ref([])
 
 // 当前 AI 正在生成的回复
 const currentResponse = ref('')
-// 取消全部编辑态（防止提交中误取消）
-function cancelAllEditing() {
-  if (renamingId.value) return
-  if (Array.isArray(chatHistory.value)) {
-    chatHistory.value.forEach(c => { c.editing = 0 })
-  }
-}
-
 
 const userStore = useUserStore()
+
 // 开始新对话
 async function startNewChat() {
   // const newChatId = Date.now().toString()
@@ -159,12 +171,16 @@ const isAnyEditing = computed(() =>
 
 // 正在提交重命名的会话ID（防重复提交）
 const renamingId = ref(null)
+// 保存原始标题，用于取消时恢复
+const originalTitle = ref(null)
 
 // 进入重命名（仅允许单例编辑）
 async function renameSession(data) {
   if (Array.isArray(chatHistory.value)) {
     chatHistory.value.forEach(c => { c.editing = 0 })
   }
+  // 保存原始标题
+  originalTitle.value = data.title || ''
   data.editing = 1
   await nextTick();
   const inputEl = document.querySelector('.history-item.active .el-input__inner') || document.querySelector('.history-item .el-input__inner');
@@ -173,14 +189,25 @@ async function renameSession(data) {
   }
 }
 
+// 取消重命名
+function cancelRename(chat) {
+  if (chat) {
+    // 恢复原始标题
+    chat.title = originalTitle.value || ''
+    chat.editing = 0
+    originalTitle.value = null
+  }
+}
+
 // 确认提交重命名
 async function confirmRename(chat) {
   if (!chat || renamingId.value) return
   renamingId.value = chat.id
   try {
-    const response = await chatAPI.putRenameSession(chat.title || '', chat.id)
+    const response = await chatAPI.putRenameSession(chat.id, chat.title || '')
     if (response?.code === 200) {
       chat.editing = 0
+      originalTitle.value = null
       ElMessage.success('重命名成功！')
     } else {
       ElMessage.error(`重命名失败：${response?.msg || '未知错误'}`)
@@ -189,6 +216,7 @@ async function confirmRename(chat) {
     ElMessage.error('重命名失败：网络或服务器异常')
   } finally {
     renamingId.value = null
+    await loadChatHistory()
   }
 }
 
@@ -210,6 +238,7 @@ async function deleteSession(id, name) {
             type: 'success',
             message: `删除 ${name} 成功！`,
           })
+          loadChatHistory()
         }
         else {
           ElMessage({
@@ -217,7 +246,6 @@ async function deleteSession(id, name) {
             message: `删除 ${name} 失败！请联系管理员。`,
           })
         }
-        loadChatHistory()
       })
       .catch(() => {
         ElMessage({
@@ -438,7 +466,7 @@ onMounted(() => {
       padding: 0 1rem 1rem;
       
       .history-item {
-        max-height: 48px;
+        min-height: 48px;
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -465,6 +493,29 @@ onMounted(() => {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .rename-editing {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          
+          .rename-input {
+            flex: 1;
+            min-width: 0;
+          }
+          
+          .rename-confirm-btn,
+          .rename-cancel-btn {
+            flex-shrink: 0;
+            margin-left: 0 !important;
+          }
+          
+          // 覆盖 Element Plus 默认的按钮间距
+          :deep(.el-button + .el-button) {
+            margin-left: 0 !important;
+          }
         }
 
           .actions {
