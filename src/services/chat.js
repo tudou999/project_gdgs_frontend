@@ -37,8 +37,8 @@ export const chatAPI = {
 
   // 重命名聊天会话
   putRenameSession(chatId, name) {
-    return apiClient.put(`/session`, {
-      param: {
+    return apiClient.put(`/session`,null,{
+      params: {
         id: chatId,
         title: name
       }
