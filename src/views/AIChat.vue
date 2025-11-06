@@ -80,13 +80,15 @@
                       placeholder="向CORS智能助手提问"
                       rows="1"
                       ref="inputRef"/>
-            <button 
+            <el-button
               class="send-button" 
               @click="startStream(userInput, currentChatId)"
               :disabled="isStreaming || (!userInput.trim())"
             >
-              <PaperAirplaneIcon class="icon" />
-            </button>
+              <el-icon class="icon" size="large">
+                <Position />
+              </el-icon>
+            </el-button>
           </div>
         </div>
       </el-main>
@@ -96,7 +98,7 @@
 </template>
 
 <script setup>
-import {ChatDotSquare, More} from "@element-plus/icons-vue";
+import {ChatDotSquare, More, Position} from "@element-plus/icons-vue";
 
 defineOptions ({
   name: 'AIChat'
@@ -601,7 +603,7 @@ onMounted(() => {
       .input-row {
         display: flex;
         gap: 1rem;
-        align-items: flex-end;
+        align-items: center;
         background: var(--el-bg-color);
         padding: 0.75rem;
         border-radius: 1rem;
