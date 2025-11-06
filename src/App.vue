@@ -33,7 +33,7 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-// 是否显示退出按钮（登录和注册页面不显示）
+// 是否显示退出登录按钮（登录和注册页面不显示）
 const showButton = computed(() => {
   return isLoggedIn.value && currentRoute.value !== '/login' && currentRoute.value !== '/register'
 })
@@ -50,12 +50,6 @@ onMounted(() => {
 
 // 添加全局路由守卫
 router.beforeEach((to, from, next) => {
-  // 如果是从 ChatPDF 页面离开
-  if (from.path === '/chat-pdf') {
-    // 触发一个自定义事件，让 ChatPDF 组件知道要清理资源
-    window.dispatchEvent(new CustomEvent('cleanupChatPDF'))
-  }
-
   // 检查登录状态
   checkLoginStatus()
 
