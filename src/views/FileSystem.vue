@@ -267,7 +267,7 @@ async function downloadFile(id) {
 
 <template>
   <el-container>
-    <el-main>
+    <el-main style="margin: 0 400px">
       <div class="header-section">
         <!-- 面包屑 -->
         <el-breadcrumb style="margin: 0" :separator-icon="ArrowRight">
@@ -374,25 +374,38 @@ async function downloadFile(id) {
 <style scoped lang="scss">
 .file-item {
   font-size: 16px;
-  padding: 10px 16px;
-  margin-bottom: 8px;
-  border-radius: 8px;
+  padding: 0 16px;
+  margin-bottom: 0;
+  border-radius: 0;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  border-bottom: none;
+  box-shadow: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+}
+
+.file-item:first-child {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.file-item:last-child {
+  border-bottom: 1px solid var(--el-border-color);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 
 .file-item:hover {
   background: color-mix(in srgb, var(--el-color-primary) 6%, transparent);
   border-color: color-mix(in srgb, var(--el-color-primary) 25%, var(--el-border-color));
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
 }
 
 .file-item:active {
-  transform: translateY(0);
+  background: color-mix(in srgb, var(--el-color-primary) 8%, transparent);
 }
 
 .el-breadcrumb {
@@ -458,10 +471,8 @@ async function downloadFile(id) {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 40px;
+  min-height: 48px;
   background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
-  border-radius: 8px;
   padding: 8px 10px;
 }
 
@@ -470,6 +481,7 @@ async function downloadFile(id) {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  min-height: 48px;
 }
 
 .file-name {
