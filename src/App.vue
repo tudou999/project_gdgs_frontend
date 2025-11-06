@@ -4,7 +4,7 @@ import { useDark, useToggle } from '@vueuse/core'
 import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
-import {User, SwitchButton, Back, House} from "@element-plus/icons-vue";
+import {User, SwitchButton, HomeFilled} from "@element-plus/icons-vue";
 import { useUserStore } from './stores/user'
 
 const isDark = useDark()
@@ -95,7 +95,7 @@ router.beforeEach((to, from, next) => {
             title="返回首页"
         >
           <el-icon style="vertical-align: middle">
-            <House />
+            <HomeFilled />
           </el-icon>
         </el-button>
       </div>

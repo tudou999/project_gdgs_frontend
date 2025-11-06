@@ -464,6 +464,7 @@ onMounted(() => {
         justify-content: center;
         cursor: pointer;
         transition: background-color 0.3s;
+        vertical-align: center;
         
         &:hover:not(:disabled) {
           background: #000;
