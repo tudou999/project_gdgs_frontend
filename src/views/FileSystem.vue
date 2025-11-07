@@ -15,6 +15,8 @@ const breadcrumbTrail = ref([{ id: null, name: '全部文件' }])
 const existingNew = ref(false)
 // 处于重命名状态的文件 ID
 const renamingId = ref(null);
+// 下拉菜单实例的 Map，用于控制关闭时机
+const dropdownRefs = ref(new Map());
 
 // 是否有文件处于编辑状态
 const isAnyEditing = computed(() =>
@@ -338,13 +340,13 @@ async function downloadFile(id) {
               trigger="click"
               size="large"
               :hide-on-click="false">
-            <el-button size="large" :disabled="isAnyEditing && file.editing === 0">
+            <el-button size="default" :disabled="isAnyEditing && file.editing === 0">
               菜单
               <el-icon class="el-icon--right" size="large"><Operation /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="downloadFile(file.id)">下载</el-dropdown-item>
+                <el-dropdown-item @click="downloadFile(file.id)" v-if="!file.folder">下载</el-dropdown-item>
                 <el-dropdown-item @click="clickRenameButton(file)">重命名</el-dropdown-item>
                 <el-dropdown-item class="my-class">
                   <el-popconfirm
