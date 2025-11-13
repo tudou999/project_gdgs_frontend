@@ -32,7 +32,11 @@ export const chatAPI = {
 
   // 创建新的聊天会话
   postCreateSession() {
-    return apiClient.post('/session');
+    return apiClient.post('/session',null, {
+      params: {
+        title: '新对话'
+      }
+    });
   },
 
   // 重命名聊天会话
