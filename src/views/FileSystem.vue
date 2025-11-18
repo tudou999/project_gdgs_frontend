@@ -1,4 +1,6 @@
 <script setup>
+// TODO：显示文件大小（注意单位，后端返回的是字节）
+// TODO：文件上传，这里要传一个当前所在位置给文件上传组件
 import {ElMessage} from "element-plus";
 import {ArrowRight, Check, Close, FolderAdd, Operation} from '@element-plus/icons-vue'
 import {computed, nextTick, ref, watch} from "vue";
