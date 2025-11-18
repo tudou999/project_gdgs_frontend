@@ -11,7 +11,6 @@
         v-loading="loading"
         size="large"
         :data="users">
-          <el-table-column prop="id" label="ID" width="180" />
           <el-table-column prop="email" label="邮箱" min-width="180" />
           <el-table-column prop="username" label="用户名" align="center" min-width="150">
             <template #default="scope">
