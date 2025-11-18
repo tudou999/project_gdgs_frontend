@@ -145,6 +145,9 @@ const chatHistory = ref([])
 
 // 当前 AI 正在生成的回复
 const currentResponse = ref('')
+// TODO：对话的同时可以新建对话，并且不会影响到老对话的数据接收
+// TODO：无限滚动功能实现
+// TODO：创建新对话时起名逻辑要更改（如果是直接从对话那里，就从对话的第一个问题起名；如果是新建，就暂时用新建对话。无论如何都从输入提问的时候才真正创建新对话）
 
 const userStore = useUserStore()
 
@@ -297,6 +300,7 @@ function startStream(data, sessionId) {
   // 重置状态
   currentResponse.value = ''
   isStreaming.value = true
+  userInput.value = ''
 
   // 将用户消息加入消息区
   currentMessages.value.push({
