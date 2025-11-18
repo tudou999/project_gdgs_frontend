@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useUserStore } from '../stores/user';
 import { ElMessage } from 'element-plus';
 
-const BASE_URL = 'http://localhost/api/v1';
+const BASE_URL = '/api/v1';
 
 // 添加 token
 const addAuthHeader = (config) => {
