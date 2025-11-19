@@ -1,11 +1,11 @@
 <script setup>
-// TODO：显示文件大小（注意单位，后端返回的是字节）
 // TODO：文件上传，这里要传一个当前所在位置给文件上传组件
 import {ElMessage} from "element-plus";
 import {ArrowRight, Check, Close, FolderAdd, Operation} from '@element-plus/icons-vue'
 import {computed, nextTick, ref, watch} from "vue";
 import {fileAPI} from "../services/file";
 import {useRoute, useRouter} from 'vue-router';
+import {filesize} from "filesize";
 
 defineOptions({ name: "FileController" })
 
@@ -267,6 +267,11 @@ async function downloadFile(id) {
   ElMessage.success('开始下载！')
   URL.revokeObjectURL(fileUrl);
 }
+
+// 计算文件大小
+function calculateFileSize(size) {
+  return filesize(size, {standard: "jedec"})
+}
 </script>
 
 <template>
@@ -335,14 +340,14 @@ async function downloadFile(id) {
 
           <!-- 文件 -->
           <div v-else class="file-name">
-            {{ file.name }}
+            <span class="file-name-text">{{ file.name }}</span>
+            <span class="file-size-text">{{ calculateFileSize(file.size) }}</span>
           </div>
-
           <el-dropdown
               trigger="click"
               size="large"
               :hide-on-click="false">
-            <el-button size="default" :disabled="isAnyEditing && file.editing === 0">
+            <el-button size="default" :disabled="isAnyEditing && file.editing === 0" >
               菜单
               <el-icon class="el-icon--right" size="large"><Operation /></el-icon>
             </el-button>
@@ -490,10 +495,18 @@ async function downloadFile(id) {
 
 .file-name {
   color: var(--el-text-color-primary);
+  display: flex;
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.file-size-text {
+  margin-left: auto;
+  flex-shrink: 0;
+  margin-right: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .action-button {
