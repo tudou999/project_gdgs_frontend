@@ -1,12 +1,12 @@
-import { apiClient, rawApiClient } from './client';
+import { apiClient, rawApiClient } from "./client";
 
 export const fileAPI = {
   // 获取文件列表
   getFolderList(folderId) {
-    return apiClient.get('/file/list', {
-      params:{
-        id: folderId
-      }
+    return apiClient.get("/file/list", {
+      params: {
+        id: folderId,
+      },
     });
   },
 
@@ -17,17 +17,17 @@ export const fileAPI = {
 
   // 创建新文件夹
   postCreateFolder(id, name) {
-    return apiClient.post('/file/folder', {
+    return apiClient.post("/file/folder", {
       parentId: id,
-      name: name
+      name: name,
     });
   },
 
   // 重命名文件/文件夹
   putRenameFile(id, name) {
-    return apiClient.put('/file/rename', {
+    return apiClient.put("/file/rename", {
       id: id,
-      newName: name
+      newName: name,
     });
   },
 
@@ -38,11 +38,20 @@ export const fileAPI = {
 
   // 下载文件
   getDownloadFile(id) {
-    return rawApiClient.get('/file/download', {
-      params:{
-        id: id
+    return rawApiClient.get("/file/download", {
+      params: {
+        id: id,
       },
-      responseType: 'blob'
-    })
-  }
+      responseType: "blob",
+    });
+  },
+
+  // 上传文件
+  postUploadFile(id, file) {
+    return rawApiClient.post("/file/upload", file, {
+      params: {
+        "parent-id": id,
+      },
+    });
+  },
 };

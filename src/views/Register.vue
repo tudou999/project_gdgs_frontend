@@ -1,13 +1,12 @@
 <template>
-  <div class="register-container" :class="{ 'dark': isDark }">
+  <div class="register-container" :class="{ dark: isDark }">
     <div class="register-card">
       <div class="register-header">
         <h1 class="register-title">创建新账号</h1>
         <p class="register-subtitle">请填写以下信息完成注册</p>
       </div>
-      
-      <form class="register-form" @submit.prevent="handleRegister">
 
+      <form class="register-form" @submit.prevent="handleRegister">
         <div class="form-group">
           <label for="email" class="form-label">邮箱地址</label>
           <div class="input-wrapper">
@@ -18,15 +17,25 @@
               class="form-input"
               placeholder="请输入您的邮箱地址"
               required
-            >
+            />
             <div class="input-icon">
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path>
+              <svg
+                class="icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"
+                ></path>
               </svg>
             </div>
           </div>
         </div>
-        
+
         <div class="form-group">
           <label for="password" class="form-label">密码</label>
           <div class="input-wrapper">
@@ -37,10 +46,20 @@
               class="form-input"
               placeholder="请输入密码（至少6位）"
               required
-            >
+            />
             <div class="input-icon">
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+              <svg
+                class="icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                ></path>
               </svg>
             </div>
             <button
@@ -48,12 +67,39 @@
               class="password-toggle"
               @click="showPassword = !showPassword"
             >
-              <svg v-if="showPassword" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+              <svg
+                v-if="showPassword"
+                class="icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                ></path>
               </svg>
-              <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              <svg
+                v-else
+                class="icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                ></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                ></path>
               </svg>
             </button>
           </div>
@@ -69,10 +115,20 @@
               class="form-input"
               placeholder="请再次输入密码"
               required
-            >
+            />
             <div class="input-icon">
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+              <svg
+                class="icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                ></path>
               </svg>
             </div>
             <button
@@ -80,26 +136,55 @@
               class="password-toggle"
               @click="showConfirmPassword = !showConfirmPassword"
             >
-              <svg v-if="showConfirmPassword" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+              <svg
+                v-if="showConfirmPassword"
+                class="icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                ></path>
               </svg>
-              <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+              <svg
+                v-else
+                class="icon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                ></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                ></path>
               </svg>
             </button>
           </div>
         </div>
-        
+
         <button type="submit" class="register-button" :disabled="isLoading">
           <span v-if="isLoading" class="loading-spinner"></span>
           <span v-else>注册</span>
         </button>
-        
+
         <div class="register-footer">
           <p class="login-text">
             已有账号？
-            <a href="#" class="login-link" @click.prevent="gotoLogin">立即登录</a>
+            <a href="#" class="login-link" @click.prevent="gotoLogin"
+              >立即登录</a
+            >
           </p>
         </div>
       </form>
@@ -108,52 +193,52 @@
 </template>
 
 <script setup>
-defineOptions ({
-  name: 'Register'
-})
+defineOptions({
+  name: "Register",
+});
 
 // TODO: 注册功能实现
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useDark } from '@vueuse/core'
-import { SignAPI } from '../services/user.js'
-import {ElMessage} from "element-plus";
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { useDark } from "@vueuse/core";
+import { SignAPI } from "../services/user.js";
+import { ElMessage } from "element-plus";
 
-const isDark = useDark()
-const router = useRouter()
+const isDark = useDark();
+const router = useRouter();
 
 const registerForm = ref({
-  email: '',
-  password: '',
-  confirmPassword: '',
-})
+  email: "",
+  password: "",
+  confirmPassword: "",
+});
 
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
-const isLoading = ref(false)
+const showPassword = ref(false);
+const showConfirmPassword = ref(false);
+const isLoading = ref(false);
 
 // 注册处理函数
 const handleRegister = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
-    const response = await SignAPI.register(registerForm.value)
+    const response = await SignAPI.register(registerForm.value);
     if (response.code === 200) {
-      router.push('/home')
-      ElMessage.success('注册成功！')
+      router.push("/home");
+      ElMessage.success("注册成功！");
     } else {
-      ElMessage.error(response.msg)
+      ElMessage.error(response.msg);
     }
   } catch (error) {
-    ElMessage.warning('注册失败，请联系管理员。')
+    ElMessage.warning("注册失败，请联系管理员。");
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 // 跳转到登录页面
 const gotoLogin = () => {
-  router.push('/login')
-}
+  router.push("/login");
+};
 </script>
 
 <style scoped lang="scss">
@@ -190,7 +275,7 @@ const gotoLogin = () => {
       font-weight: 700;
       color: #1a1a1a;
       margin: 0 0 0.5rem 0;
-      background: linear-gradient(135deg, #007CF0, #00D4FF);
+      background: linear-gradient(135deg, #007cf0, #00d4ff);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -232,7 +317,7 @@ const gotoLogin = () => {
           outline: none;
 
           &:focus {
-            border-color: #007CF0;
+            border-color: #007cf0;
             background: rgba(255, 255, 255, 0.95);
             box-shadow: 0 0 0 3px rgba(0, 124, 240, 0.1);
           }
@@ -266,7 +351,7 @@ const gotoLogin = () => {
           transition: color 0.2s ease;
 
           &:hover {
-            color: #007CF0;
+            color: #007cf0;
           }
 
           .icon {
@@ -290,7 +375,7 @@ const gotoLogin = () => {
           height: 1rem;
           margin-right: 0.5rem;
           margin-top: 0.125rem;
-          accent-color: #007CF0;
+          accent-color: #007cf0;
           flex-shrink: 0;
         }
 
@@ -300,7 +385,7 @@ const gotoLogin = () => {
           line-height: 1.4;
 
           .terms-link {
-            color: #007CF0;
+            color: #007cf0;
             text-decoration: none;
             transition: color 0.2s ease;
 
@@ -315,7 +400,7 @@ const gotoLogin = () => {
     .register-button {
       width: 100%;
       padding: 1rem;
-      background: linear-gradient(135deg, #007CF0, #00D4FF);
+      background: linear-gradient(135deg, #007cf0, #00d4ff);
       color: white;
       border: none;
       border-radius: 0.75rem;
@@ -362,7 +447,7 @@ const gotoLogin = () => {
         margin: 0;
 
         .login-link {
-          color: #007CF0;
+          color: #007cf0;
           text-decoration: none;
           font-weight: 600;
           transition: color 0.2s ease;
@@ -407,7 +492,7 @@ const gotoLogin = () => {
 
           &:focus {
             background: rgba(255, 255, 255, 0.1);
-            border-color: #007CF0;
+            border-color: #007cf0;
             box-shadow: 0 0 0 3px rgba(0, 124, 240, 0.2);
           }
 
@@ -424,7 +509,7 @@ const gotoLogin = () => {
           color: #6b7280;
 
           &:hover {
-            color: #007CF0;
+            color: #007cf0;
           }
         }
       }

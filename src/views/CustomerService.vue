@@ -1,5 +1,5 @@
 <template>
-  <div class="customer-service" :class="{ 'dark': isDark }">
+  <div class="customer-service" :class="{ dark: isDark }">
     <div class="chat-container">
       <div class="sidebar">
         <div class="history-header">
@@ -10,19 +10,19 @@
           </button>
         </div>
         <div class="history-list">
-          <div 
-            v-for="chat in chatHistory" 
+          <div
+            v-for="chat in chatHistory"
             :key="chat.id"
             class="history-item"
-            :class="{ 'active': currentChatId === chat.id }"
+            :class="{ active: currentChatId === chat.id }"
             @click="loadChat(chat.id)"
           >
             <ChatBubbleLeftRightIcon class="icon" />
-            <span class="title">{{ chat.title || '新咨询' }}</span>
+            <span class="title">{{ chat.title || "新咨询" }}</span>
           </div>
         </div>
       </div>
-      
+
       <div class="chat-main">
         <div class="service-header">
           <div class="service-info">
@@ -42,7 +42,7 @@
             :is-stream="isStreaming && index === currentMessages.length - 1"
           />
         </div>
-        
+
         <div class="input-area">
           <textarea
             v-model="userInput"
@@ -51,8 +51,8 @@
             rows="1"
             ref="inputRef"
           ></textarea>
-          <button 
-            class="send-button" 
+          <button
+            class="send-button"
             @click="sendMessage()"
             :disabled="isStreaming || !userInput.trim()"
           >
@@ -74,194 +74,196 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import { useDark } from '@vueuse/core'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
-import { 
-  ChatBubbleLeftRightIcon, 
+import { ref, onMounted, nextTick } from "vue";
+import { useDark } from "@vueuse/core";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import {
+  ChatBubbleLeftRightIcon,
   PaperAirplaneIcon,
   PlusIcon,
-  ComputerDesktopIcon
-} from '@heroicons/vue/24/outline'
-import ChatMessage from '../components/ChatMessage.vue'
-import { chatAPI } from '../services/chat.js'
+  ComputerDesktopIcon,
+} from "@heroicons/vue/24/outline";
+import ChatMessage from "../components/ChatMessage.vue";
+import { chatAPI } from "../services/chat.js";
 
-const isDark = useDark()
-const messagesRef = ref(null)
-const inputRef = ref(null)
-const userInput = ref('')
-const isStreaming = ref(false)
-const currentChatId = ref(null)
-const currentMessages = ref([])
-const chatHistory = ref([])
-const showBookingModal = ref(false)
-const bookingInfo = ref('')
+const isDark = useDark();
+const messagesRef = ref(null);
+const inputRef = ref(null);
+const userInput = ref("");
+const isStreaming = ref(false);
+const currentChatId = ref(null);
+const currentMessages = ref([]);
+const chatHistory = ref([]);
+const showBookingModal = ref(false);
+const bookingInfo = ref("");
 
 // 配置 marked
 marked.setOptions({
-  breaks: true,  // 支持换行
-  gfm: true,     // 支持 GitHub Flavored Markdown
-  sanitize: false // 允许 HTML
-})
+  breaks: true, // 支持换行
+  gfm: true, // 支持 GitHub Flavored Markdown
+  sanitize: false, // 允许 HTML
+});
 
 // 自动调整输入框高度
 const adjustTextareaHeight = () => {
-  const textarea = inputRef.value
+  const textarea = inputRef.value;
   if (textarea) {
-    textarea.style.height = 'auto'
-    textarea.style.height = textarea.scrollHeight + 'px'
+    textarea.style.height = "auto";
+    textarea.style.height = textarea.scrollHeight + "px";
   }
-}
+};
 
 // 滚动到底部
 const scrollToBottom = async () => {
-  await nextTick()
+  await nextTick();
   if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+    messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
   }
-}
+};
 
 // 发送消息
 const sendMessage = async (content) => {
-  if (isStreaming.value || (!content && !userInput.value.trim())) return
-  
+  if (isStreaming.value || (!content && !userInput.value.trim())) return;
+
   // 使用传入的 content 或用户输入框的内容
-  const messageContent = content || userInput.value.trim()
-  
+  const messageContent = content || userInput.value.trim();
+
   // 添加用户消息
   const userMessage = {
-    role: 'user',
+    role: "user",
     content: messageContent,
-    timestamp: new Date()
-  }
-  currentMessages.value.push(userMessage)
-  
+    timestamp: new Date(),
+  };
+  currentMessages.value.push(userMessage);
+
   // 清空输入
-  if (!content) {  // 只有在非传入内容时才清空输入框
-    userInput.value = ''
-    adjustTextareaHeight()
+  if (!content) {
+    // 只有在非传入内容时才清空输入框
+    userInput.value = "";
+    adjustTextareaHeight();
   }
-  await scrollToBottom()
-  
+  await scrollToBottom();
+
   // 添加助手消息占位
   const assistantMessage = {
-    role: 'assistant',
-    content: '',
+    role: "assistant",
+    content: "",
     timestamp: new Date(),
-    isMarkdown: true  // 添加标记表示这是 Markdown 内容
-  }
-  currentMessages.value.push(assistantMessage)
-  isStreaming.value = true
-  
-  let accumulatedContent = ''
-  
+    isMarkdown: true, // 添加标记表示这是 Markdown 内容
+  };
+  currentMessages.value.push(assistantMessage);
+  isStreaming.value = true;
+
+  let accumulatedContent = "";
+
   try {
-    const reader = await chatAPI.sendServiceMessage(messageContent, currentChatId.value)
-    const decoder = new TextDecoder('utf-8')
-    
+    const reader = await chatAPI.sendServiceMessage(
+      messageContent,
+      currentChatId.value,
+    );
+    const decoder = new TextDecoder("utf-8");
+
     while (true) {
       try {
-        const { value, done } = await reader.read()
-        if (done) break
-        
+        const { value, done } = await reader.read();
+        if (done) break;
+
         // 累积新内容
-        accumulatedContent += decoder.decode(value)
-        
+        accumulatedContent += decoder.decode(value);
+
         await nextTick(() => {
           // 更新消息
           const updatedMessage = {
             ...assistantMessage,
             content: accumulatedContent,
-            isMarkdown: true  // 保持 Markdown 标记
-          }
-          const lastIndex = currentMessages.value.length - 1
-          currentMessages.value.splice(lastIndex, 1, updatedMessage)
-        })
-        await scrollToBottom()
+            isMarkdown: true, // 保持 Markdown 标记
+          };
+          const lastIndex = currentMessages.value.length - 1;
+          currentMessages.value.splice(lastIndex, 1, updatedMessage);
+        });
+        await scrollToBottom();
       } catch (readError) {
-        console.error('读取流错误:', readError)
-        break
+        console.error("读取流错误:", readError);
+        break;
       }
     }
 
     // 检查是否包含预约信息
-    if (accumulatedContent.includes('预约编号')) {
-      const bookingMatch = accumulatedContent.match(/【(.*?)】/s)
+    if (accumulatedContent.includes("预约编号")) {
+      const bookingMatch = accumulatedContent.match(/【(.*?)】/s);
       if (bookingMatch) {
         // 使用 marked 处理预约信息中的 Markdown
-        bookingInfo.value = DOMPurify.sanitize(
-          marked.parse(bookingMatch[1]),
-          {
-            ADD_TAGS: ['code', 'pre', 'span'],
-            ADD_ATTR: ['class', 'language']
-          }
-        )
-        showBookingModal.value = true
+        bookingInfo.value = DOMPurify.sanitize(marked.parse(bookingMatch[1]), {
+          ADD_TAGS: ["code", "pre", "span"],
+          ADD_ATTR: ["class", "language"],
+        });
+        showBookingModal.value = true;
       }
     }
   } catch (error) {
-    console.error('发送消息失败:', error)
-    assistantMessage.content = '抱歉，发生了错误，请稍后重试。'
+    console.error("发送消息失败:", error);
+    assistantMessage.content = "抱歉，发生了错误，请稍后重试。";
   } finally {
-    isStreaming.value = false
-    await scrollToBottom()
+    isStreaming.value = false;
+    await scrollToBottom();
   }
-}
+};
 
 // 加载特定对话
 const loadChat = async (chatId) => {
-  currentChatId.value = chatId
+  currentChatId.value = chatId;
   try {
-    const messages = await chatAPI.getChatMessages(chatId, 'service')
-    currentMessages.value = messages.map(msg => ({
+    const messages = await chatAPI.getChatMessages(chatId, "service");
+    currentMessages.value = messages.map((msg) => ({
       ...msg,
-      isMarkdown: msg.role === 'assistant'  // 为助手消息添加 Markdown 标记
-    }))
+      isMarkdown: msg.role === "assistant", // 为助手消息添加 Markdown 标记
+    }));
   } catch (error) {
-    console.error('加载对话消息失败:', error)
-    currentMessages.value = []
+    console.error("加载对话消息失败:", error);
+    currentMessages.value = [];
   }
-}
+};
 
 // 加载聊天历史
 const loadChatHistory = async () => {
   try {
-    const history = await chatAPI.getChatHistory('service')
-    chatHistory.value = history || []
+    const history = await chatAPI.getChatHistory("service");
+    chatHistory.value = history || [];
     if (history && history.length > 0) {
-      await loadChat(history[0].id)
+      await loadChat(history[0].id);
     } else {
-      await startNewChat()  // 等待 startNewChat 完成
+      await startNewChat(); // 等待 startNewChat 完成
     }
   } catch (error) {
-    console.error('加载聊天历史失败:', error)
-    chatHistory.value = []
-    await startNewChat()  // 等待 startNewChat 完成
+    console.error("加载聊天历史失败:", error);
+    chatHistory.value = [];
+    await startNewChat(); // 等待 startNewChat 完成
   }
-}
+};
 
 // 开始新对话
-const startNewChat = async () => {  // 添加 async
-  const newChatId = Date.now().toString()
-  currentChatId.value = newChatId
-  currentMessages.value = []
-  
+const startNewChat = async () => {
+  // 添加 async
+  const newChatId = Date.now().toString();
+  currentChatId.value = newChatId;
+  currentMessages.value = [];
+
   // 添加新对话到历史列表
   const newChat = {
     id: newChatId,
-    title: `咨询 ${newChatId.slice(-6)}`
-  }
-  chatHistory.value = [newChat, ...chatHistory.value]
+    title: `咨询 ${newChatId.slice(-6)}`,
+  };
+  chatHistory.value = [newChat, ...chatHistory.value];
 
   // 发送初始问候语
-  await sendMessage('你好')
-}
+  await sendMessage("你好");
+};
 
 onMounted(() => {
-  loadChatHistory()
-  adjustTextareaHeight()
-})
+  loadChatHistory();
+  adjustTextareaHeight();
+});
 </script>
 
 <style scoped lang="scss">
@@ -295,18 +297,18 @@ onMounted(() => {
     backdrop-filter: blur(10px);
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    
+
     .history-header {
       flex-shrink: 0;
       padding: 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      
+
       h2 {
         font-size: 1.25rem;
       }
-      
+
       .new-chat {
         display: flex;
         align-items: center;
@@ -318,23 +320,23 @@ onMounted(() => {
         border: none;
         cursor: pointer;
         transition: background-color 0.3s;
-        
+
         &:hover {
           background: #000;
         }
-        
+
         .icon {
           width: 1.25rem;
           height: 1.25rem;
         }
       }
     }
-    
+
     .history-list {
       flex: 1;
       overflow-y: auto;
       padding: 0 1rem 1rem;
-      
+
       .history-item {
         display: flex;
         align-items: center;
@@ -343,20 +345,20 @@ onMounted(() => {
         border-radius: 0.5rem;
         cursor: pointer;
         transition: background-color 0.3s;
-        
+
         &:hover {
           background: rgba(0, 0, 0, 0.05);
         }
-        
+
         &.active {
           background: rgba(0, 0, 0, 0.1);
         }
-        
+
         .icon {
           width: 1.25rem;
           height: 1.25rem;
         }
-        
+
         .title {
           flex: 1;
           overflow: hidden;
@@ -396,7 +398,7 @@ onMounted(() => {
           background: #f0f0f0;
           border-radius: 12px;
           transition: all 0.3s ease;
-          
+
           &:hover {
             background: #e0e0e0;
             transform: scale(1.05);
@@ -416,13 +418,13 @@ onMounted(() => {
         }
       }
     }
-    
+
     .messages {
       flex: 1;
       overflow-y: auto;
       padding: 2rem;
     }
-    
+
     .input-area {
       flex-shrink: 0;
       padding: 1.5rem 2rem;
@@ -431,7 +433,7 @@ onMounted(() => {
       display: flex;
       gap: 1rem;
       align-items: flex-end;
-      
+
       textarea {
         flex: 1;
         resize: none;
@@ -444,14 +446,14 @@ onMounted(() => {
         font-size: 1rem;
         line-height: 1.5;
         max-height: 150px;
-        
+
         &:focus {
           outline: none;
           border-color: #333;
           box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
         }
       }
-      
+
       .send-button {
         background: #333;
         color: white;
@@ -465,16 +467,16 @@ onMounted(() => {
         cursor: pointer;
         transition: background-color 0.3s;
         vertical-align: center;
-        
+
         &:hover:not(:disabled) {
           background: #000;
         }
-        
+
         &:disabled {
           background: #ccc;
           cursor: not-allowed;
         }
-        
+
         .icon {
           width: 1.25rem;
           height: 1.25rem;
@@ -538,11 +540,11 @@ onMounted(() => {
     background: rgba(40, 40, 40, 0.95);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
   }
-  
+
   .chat-main {
     background: rgba(40, 40, 40, 0.95);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-    
+
     .service-header {
       background: rgba(30, 30, 30, 0.98);
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -551,7 +553,7 @@ onMounted(() => {
         .avatar {
           color: #fff;
           background: #444;
-          
+
           &:hover {
             background: #555;
           }
@@ -566,12 +568,12 @@ onMounted(() => {
     .input-area {
       background: rgba(30, 30, 30, 0.98);
       border-top: 1px solid rgba(255, 255, 255, 0.05);
-      
+
       textarea {
         background: rgba(50, 50, 50, 0.95);
         border-color: rgba(255, 255, 255, 0.1);
         color: white;
-        
+
         &:focus {
           border-color: #666;
           box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
@@ -606,14 +608,14 @@ onMounted(() => {
     .chat-container {
       padding: 0;
     }
-    
+
     .sidebar {
       display: none;
     }
-    
+
     .chat-main {
       border-radius: 0;
     }
   }
 }
-</style> 
+</style>

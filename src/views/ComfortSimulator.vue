@@ -4,11 +4,10 @@
   </div>
 </template>
 
-<script setup>
-</script>
+<script setup></script>
 
 <style scoped>
 .comfort-simulator {
   padding: 2rem;
 }
-</style> 
+</style>

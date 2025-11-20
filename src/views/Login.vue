@@ -1,30 +1,39 @@
 <template>
   <el-container class="login-container">
     <el-container class="login-card">
-<!--      标题-->
+      <!--      标题-->
       <el-header class="login-header">
         <h1 class="login-title">欢迎回来</h1>
         <p class="login-subtitle">请使用您的邮箱和密码登录</p>
       </el-header>
 
-<!--      表单体-->
-      <el-form :model="loginForm" class="login-form" @submit.prevent="handleLogin">
-
+      <!--      表单体-->
+      <el-form
+        :model="loginForm"
+        class="login-form"
+        @submit.prevent="handleLogin"
+      >
         <el-form-item label="邮箱地址" label-position="top" size="large">
           <el-input
             v-model="loginForm.email"
             placeholder="请输入您的邮箱地址"
-            prefix-icon="UserFilled" />
+            prefix-icon="UserFilled"
+          />
         </el-form-item>
 
         <el-form-item label="密码" label-position="top" size="large">
           <el-input
-              v-model="loginForm.password"
-              placeholder="请输入您的密码"
-              prefix-icon="Key"
-              :type="showPassword ? 'text' : 'password'">
+            v-model="loginForm.password"
+            placeholder="请输入您的密码"
+            prefix-icon="Key"
+            :type="showPassword ? 'text' : 'password'"
+          >
             <template #suffix>
-              <el-button @click="showPassword = !showPassword" link style="border: none; box-shadow: none;">
+              <el-button
+                @click="showPassword = !showPassword"
+                link
+                style="border: none; box-shadow: none"
+              >
                 <el-icon v-if="showPassword"><Hide /></el-icon>
                 <el-icon v-else><View /></el-icon>
               </el-button>
@@ -33,17 +42,25 @@
         </el-form-item>
       </el-form>
 
-<!--      登录按钮-->
-      <el-button @click="handleLogin" class="login-button" :disabled="isLoading" size="large" style="margin-top: 1.5rem;">
+      <!--      登录按钮-->
+      <el-button
+        @click="handleLogin"
+        class="login-button"
+        :disabled="isLoading"
+        size="large"
+        style="margin-top: 1.5rem"
+      >
         <span v-if="isLoading" class="loading-spinner"></span>
         <span v-else>登录</span>
       </el-button>
 
-<!--      注册按钮-->
+      <!--      注册按钮-->
       <div class="login-footer">
         <p class="register-text">
           还没有账号？
-          <a href="#" class="register-link" @click.prevent="gotoRegister">立即注册</a>
+          <a href="#" class="register-link" @click.prevent="gotoRegister"
+            >立即注册</a
+          >
         </p>
       </div>
     </el-container>
@@ -51,58 +68,56 @@
 </template>
 
 <script setup>
-defineOptions ({
-  name: 'Login'
-})
+defineOptions({
+  name: "Login",
+});
 
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { SignAPI } from '../services/user.js'
-import { ElMessage } from 'element-plus'
-import { useUserStore } from '../stores/user'
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { SignAPI } from "../services/user.js";
+import { ElMessage } from "element-plus";
+import { useUserStore } from "../stores/user";
 
-const router = useRouter()
-const userStore = useUserStore()
-
+const router = useRouter();
+const userStore = useUserStore();
 
 const loginForm = ref({
-  email: '',
-  password: '',
-  rememberMe: false
-})
+  email: "",
+  password: "",
+  rememberMe: false,
+});
 
-const showPassword = ref(false)
-const isLoading = ref(false)
+const showPassword = ref(false);
+const isLoading = ref(false);
 
 // 登录处理函数
 const handleLogin = async () => {
-  if (isLoading.value) return
+  if (isLoading.value) return;
 
-  isLoading.value = true
+  isLoading.value = true;
 
   try {
-    const responseJson = await SignAPI.login(loginForm.value)
+    const responseJson = await SignAPI.login(loginForm.value);
 
     if (responseJson.code === 200) {
       // 使用replace避免重复登录
-      router.replace('/home')
-      ElMessage.success('登录成功！')
-      userStore.setToken(responseJson.data.token)
-    }
-    else {
-      ElMessage.error(responseJson.msg)
+      router.replace("/home");
+      ElMessage.success("登录成功！");
+      userStore.setToken(responseJson.data.token);
+    } else {
+      ElMessage.error(responseJson.msg);
     }
   } catch (error) {
-    ElMessage.warning('登录失败！请联系管理员')
+    ElMessage.warning("登录失败！请联系管理员");
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 // 跳转到注册页面
 const gotoRegister = () => {
-  router.push('/register')
-}
+  router.push("/register");
+};
 </script>
 
 <style scoped lang="scss">
@@ -138,7 +153,7 @@ const gotoRegister = () => {
       font-weight: 700;
       color: #1a1a1a;
       margin: 0 0 0.5rem 0;
-      background: linear-gradient(135deg, #007CF0, #00D4FF);
+      background: linear-gradient(135deg, #007cf0, #00d4ff);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -180,7 +195,7 @@ const gotoRegister = () => {
           outline: none;
 
           &:focus {
-            border-color: #007CF0;
+            border-color: #007cf0;
             background: rgba(255, 255, 255, 0.95);
             box-shadow: 0 0 0 3px rgba(0, 124, 240, 0.1);
           }
@@ -214,7 +229,7 @@ const gotoRegister = () => {
           transition: color 0.2s ease;
 
           &:hover {
-            color: #007CF0;
+            color: #007cf0;
           }
 
           .icon {
@@ -240,7 +255,7 @@ const gotoRegister = () => {
           width: 1rem;
           height: 1rem;
           margin-right: 0.5rem;
-          accent-color: #007CF0;
+          accent-color: #007cf0;
         }
 
         .checkbox-text {
@@ -251,7 +266,7 @@ const gotoRegister = () => {
 
       .forgot-password {
         font-size: 0.875rem;
-        color: #007CF0;
+        color: #007cf0;
         text-decoration: none;
         transition: color 0.2s ease;
 
@@ -265,7 +280,7 @@ const gotoRegister = () => {
   .login-button {
     width: 100%;
     padding: 1rem;
-    background: linear-gradient(135deg, #007CF0, #00D4FF);
+    background: linear-gradient(135deg, #007cf0, #00d4ff);
     color: white;
     border: none;
     border-radius: 0.75rem;
@@ -312,7 +327,7 @@ const gotoRegister = () => {
       margin: 0;
 
       .register-link {
-        color: #007CF0;
+        color: #007cf0;
         text-decoration: none;
         font-weight: 600;
         transition: color 0.2s ease;

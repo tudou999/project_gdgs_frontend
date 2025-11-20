@@ -1,98 +1,106 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
-import { useDark, useToggle } from '@vueuse/core'
-import { SunIcon, MoonIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
-import { useRouter } from 'vue-router'
-import { ref, computed, onMounted } from 'vue'
-import {User, SwitchButton, HomeFilled} from "@element-plus/icons-vue";
-import { useUserStore } from './stores/user'
+import { RouterLink, RouterView } from "vue-router";
+import { useDark, useToggle } from "@vueuse/core";
+import {
+  SunIcon,
+  MoonIcon,
+  ArrowRightOnRectangleIcon,
+} from "@heroicons/vue/24/outline";
+import { useRouter } from "vue-router";
+import { ref, computed, onMounted } from "vue";
+import { User, SwitchButton, HomeFilled } from "@element-plus/icons-vue";
+import { useUserStore } from "./stores/user";
 
-const isDark = useDark()
-const toggleDark = useToggle(isDark)
-const router = useRouter()
-const userStore = useUserStore()
+const isDark = useDark();
+const toggleDark = useToggle(isDark);
+const router = useRouter();
+const userStore = useUserStore();
 
 // 添加全局状态来跟踪当前路由
-const currentRoute = ref(router.currentRoute.value.path)
+const currentRoute = ref(router.currentRoute.value.path);
 
 // 登录状态管理
-const isLoggedIn = ref(false)
+const isLoggedIn = ref(false);
 // 是否显示返回首页按钮（首页/登录/注册页不显示）
 const showBack = computed(() => {
-  const hidden = ['/home', '/login', '/register']
-  return !hidden.includes(currentRoute.value)
-})
+  const hidden = ["/home", "/login", "/register"];
+  return !hidden.includes(currentRoute.value);
+});
 
 const handleGoHome = () => {
-  router.push('/home')
-}
+  router.push("/home");
+};
 
 // 检查登录状态
 const checkLoginStatus = () => {
-  const token = localStorage.getItem('token')
+  const token = localStorage.getItem("token");
   // 如果缓存中有token，value为true，否则为false
-  isLoggedIn.value = !!token
-}
+  isLoggedIn.value = !!token;
+};
 
 // 退出登录
 const handleLogout = () => {
-  userStore.clearToken()
-  isLoggedIn.value = false
+  userStore.clearToken();
+  isLoggedIn.value = false;
   // 重定向到登录页面
-  router.push('/login')
-}
+  router.push("/login");
+};
 
 // 是否显示退出登录按钮（登录和注册页面不显示）
 const showButton = computed(() => {
-  return isLoggedIn.value && currentRoute.value !== '/login' && currentRoute.value !== '/register'
-})
+  return (
+    isLoggedIn.value &&
+    currentRoute.value !== "/login" &&
+    currentRoute.value !== "/register"
+  );
+});
 
 // 跳转到管理员页
 const handleGoAdmin = () => {
-  router.push('/root')
-}
+  router.push("/root");
+};
 
 // 组件挂载时检查登录状态
 onMounted(() => {
-  checkLoginStatus()
-})
+  checkLoginStatus();
+});
 
 // 添加全局路由守卫
 router.beforeEach((to, from, next) => {
   // 检查登录状态
-  checkLoginStatus()
+  checkLoginStatus();
 
   // 如果用户未登录且访问需要登录的页面，重定向到登录页
-  const publicRoutes = ['/login', '/register']
+  const publicRoutes = ["/login", "/register"];
   if (!isLoggedIn.value && !publicRoutes.includes(to.path)) {
-    next('/login')
-    return
+    next("/login");
+    return;
   }
 
   // 如果用户已登录且访问登录/注册页面，重定向到首页
-  if (isLoggedIn.value && (to.path === '/login' || to.path === '/register')) {
-    next('/home')
-    return
+  if (isLoggedIn.value && (to.path === "/login" || to.path === "/register")) {
+    next("/home");
+    return;
   }
 
-  currentRoute.value = to.path
-  next()
-})
+  currentRoute.value = to.path;
+  next();
+});
 </script>
 
 <template>
-  <div class="app" :class="{ 'dark': isDark }">
+  <div class="app" :class="{ dark: isDark }">
     <nav class="navbar">
       <div class="navbar-left">
         <router-link to="/home" class="logo">CORS智能助手</router-link>
         <el-button
-            plain
-            style="margin-left: 10px"
-            type="primary"
-            size="default"
-            v-if="showBack"
-            @click="handleGoHome"
-            title="返回首页"
+          plain
+          style="margin-left: 10px"
+          type="primary"
+          size="default"
+          v-if="showBack"
+          @click="handleGoHome"
+          title="返回首页"
         >
           <el-icon style="vertical-align: middle">
             <HomeFilled />
@@ -157,13 +165,15 @@ router.beforeEach((to, from, next) => {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   color: var(--text-color);
   background: var(--bg-color);
   min-height: 100vh;
@@ -192,7 +202,7 @@ body {
     font-weight: bold;
     text-decoration: none;
     color: inherit;
-    background: #007CF0;
+    background: #007cf0;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }

@@ -15,132 +15,136 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
-import { DocumentTextIcon } from '@heroicons/vue/24/outline'
-import { useDark } from '@vueuse/core'
+import { ref, watch, onMounted, onUnmounted, computed } from "vue";
+import { DocumentTextIcon } from "@heroicons/vue/24/outline";
+import { useDark } from "@vueuse/core";
 
-const isDark = useDark()
+const isDark = useDark();
 const props = defineProps({
   file: {
     type: [File, null],
-    default: null
+    default: null,
   },
   fileName: {
     type: String,
-    default: ''
-  }
-})
+    default: "",
+  },
+});
 
-const isLoading = ref(false)
-const viewerRef = ref(null)
-let instance = null
+const isLoading = ref(false);
+const viewerRef = ref(null);
+let instance = null;
 
 // 使用简单的 PDF.js 实现
 onMounted(async () => {
   if (viewerRef.value && props.file) {
     try {
-      isLoading.value = true
-      
+      isLoading.value = true;
+
       // 创建 iframe 元素
-      const iframe = document.createElement('iframe')
-      iframe.style.width = '100%'
-      iframe.style.height = '100%'
-      iframe.style.border = 'none'
-      
+      const iframe = document.createElement("iframe");
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+      iframe.style.border = "none";
+
       // 创建 Blob URL
-      const url = URL.createObjectURL(props.file)
-      iframe.src = url
-      
+      const url = URL.createObjectURL(props.file);
+      iframe.src = url;
+
       // 清空容器并添加 iframe
-      viewerRef.value.innerHTML = ''
-      viewerRef.value.appendChild(iframe)
-      
+      viewerRef.value.innerHTML = "";
+      viewerRef.value.appendChild(iframe);
+
       // 监听 iframe 加载完成
       iframe.onload = () => {
-        isLoading.value = false
-      }
-      
+        isLoading.value = false;
+      };
+
       // 保存 URL 以便清理
-      instance = { url }
-      
+      instance = { url };
     } catch (error) {
-      console.error('PDF 查看器初始化失败:', error)
-      isLoading.value = false
+      console.error("PDF 查看器初始化失败:", error);
+      isLoading.value = false;
     }
   }
-})
+});
 
 // 创建 iframe 并设置主题
 const createIframe = (file) => {
-  const iframe = document.createElement('iframe')
-  iframe.style.width = '100%'
-  iframe.style.height = '100%'
-  iframe.style.border = 'none'
-  
+  const iframe = document.createElement("iframe");
+  iframe.style.width = "100%";
+  iframe.style.height = "100%";
+  iframe.style.border = "none";
+
   // 创建 Blob URL
-  const url = URL.createObjectURL(file)
-  
+  const url = URL.createObjectURL(file);
+
   // 根据当前主题设置 iframe 的背景色
   if (isDark.value) {
-    iframe.style.backgroundColor = '#1a1a1a'
+    iframe.style.backgroundColor = "#1a1a1a";
   } else {
-    iframe.style.backgroundColor = '#ffffff'
+    iframe.style.backgroundColor = "#ffffff";
   }
-  
-  iframe.src = url
-  return { iframe, url }
-}
+
+  iframe.src = url;
+  return { iframe, url };
+};
 
 // 监听文件变化
-watch(() => props.file, (newFile) => {
-  if (newFile) {
-    // 重新挂载组件
-    if (instance?.url) {
-      URL.revokeObjectURL(instance.url)
-    }
-    
-    try {
-      isLoading.value = true
-      
-      const { iframe, url } = createIframe(newFile)
-      
-      // 清空容器并添加 iframe
-      if (viewerRef.value) {
-        viewerRef.value.innerHTML = ''
-        viewerRef.value.appendChild(iframe)
+watch(
+  () => props.file,
+  (newFile) => {
+    if (newFile) {
+      // 重新挂载组件
+      if (instance?.url) {
+        URL.revokeObjectURL(instance.url);
       }
-      
-      // 监听 iframe 加载完成
-      iframe.onload = () => {
-        isLoading.value = false
+
+      try {
+        isLoading.value = true;
+
+        const { iframe, url } = createIframe(newFile);
+
+        // 清空容器并添加 iframe
+        if (viewerRef.value) {
+          viewerRef.value.innerHTML = "";
+          viewerRef.value.appendChild(iframe);
+        }
+
+        // 监听 iframe 加载完成
+        iframe.onload = () => {
+          isLoading.value = false;
+        };
+
+        // 保存 URL 以便清理
+        instance = { url, iframe };
+      } catch (error) {
+        console.error("加载 PDF 失败:", error);
+        isLoading.value = false;
       }
-      
-      // 保存 URL 以便清理
-      instance = { url, iframe }
-      
-    } catch (error) {
-      console.error('加载 PDF 失败:', error)
-      isLoading.value = false
     }
-  }
-})
+  },
+);
 
 // 监听主题变化
-watch(() => isDark.value, (newIsDark) => {
-  if (instance?.iframe) {
-    if (newIsDark) {
-      instance.iframe.style.backgroundColor = '#1a1a1a'
-    } else {
-      instance.iframe.style.backgroundColor = '#ffffff'
+watch(
+  () => isDark.value,
+  (newIsDark) => {
+    if (instance?.iframe) {
+      if (newIsDark) {
+        instance.iframe.style.backgroundColor = "#1a1a1a";
+      } else {
+        instance.iframe.style.backgroundColor = "#ffffff";
+      }
     }
-  }
-})
+  },
+);
 
 onUnmounted(() => {
   if (instance?.url) {
-    URL.revokeObjectURL(instance.url)
+    URL.revokeObjectURL(instance.url);
   }
-})
+});
 </script>
 
 <style scoped lang="scss">
@@ -204,7 +208,7 @@ onUnmounted(() => {
         width: 48px;
         height: 48px;
         border: 4px solid rgba(0, 124, 240, 0.1);
-        border-left-color: #007CF0;
+        border-left-color: #007cf0;
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
@@ -245,7 +249,7 @@ onUnmounted(() => {
 
         .loading-spinner {
           border-color: rgba(0, 124, 240, 0.2);
-          border-left-color: #007CF0;
+          border-left-color: #007cf0;
         }
 
         .loading-text {
@@ -257,7 +261,11 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
-</style> 
+</style>

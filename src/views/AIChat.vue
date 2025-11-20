@@ -1,32 +1,29 @@
 <template>
   <el-container class="ai-chat">
     <el-container class="chat-container">
-
       <!-- 侧边栏 -->
       <el-aside class="sidebar">
         <div class="history-header">
           <h2>聊天记录</h2>
-          <el-button size="large"
-                     @click="startNewChat()"
-                     type="primary">
+          <el-button size="large" @click="startNewChat()" type="primary">
             <el-icon>
-              <ChatDotSquare/>
+              <ChatDotSquare />
             </el-icon>
             新对话
           </el-button>
         </div>
         <div class="history-list">
-          <div 
-            v-for="chat in chatHistory" 
+          <div
+            v-for="chat in chatHistory"
             :key="chat.id"
             class="history-item"
-            :class="{ 'active': currentChatId === chat.id }"
+            :class="{ active: currentChatId === chat.id }"
             @click="chat.editing === 0 ? loadChat(chat.id) : null"
           >
             <ChatBubbleLeftRightIcon class="icon" />
 
             <span v-if="chat.editing === 0" class="title">
-              {{ chat.title || '新对话' }}
+              {{ chat.title || "新对话" }}
             </span>
 
             <div v-else class="rename-editing">
@@ -60,8 +57,7 @@
             </div>
 
             <span class="actions">
-              <el-dropdown size="large"
-                           trigger="click">
+              <el-dropdown size="large" trigger="click">
                 <el-button :disabled="isAnyEditing && chat.editing === 0">
                   <el-icon>
                     <More />
@@ -70,11 +66,15 @@
 
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="renameSession(chat)">重命名会话</el-dropdown-item>
-                    <el-dropdown-item @click="deleteSession(chat.id, chat.title)">删除会话</el-dropdown-item>
+                    <el-dropdown-item @click="renameSession(chat)"
+                      >重命名会话</el-dropdown-item
+                    >
+                    <el-dropdown-item
+                      @click="deleteSession(chat.id, chat.title)"
+                      >删除会话</el-dropdown-item
+                    >
                   </el-dropdown-menu>
                 </template>
-
               </el-dropdown>
             </span>
           </div>
@@ -89,22 +89,24 @@
             :key="index"
             :message="{
               role: message.senderType === 0 ? 'user' : 'assistant',
-              content: message.contents
+              content: message.contents,
             }"
             :is-stream="isStreaming && index === currentMessages.length - 1"
           />
         </div>
         <div class="input-area">
           <div class="input-row">
-            <textarea v-model="userInput"
-                      @keydown.enter.prevent="startStream"
-                      placeholder="向CORS智能助手提问"
-                      rows="1"
-                      ref="inputRef"/>
+            <textarea
+              v-model="userInput"
+              @keydown.enter.prevent="startStream"
+              placeholder="向CORS智能助手提问"
+              rows="1"
+              ref="inputRef"
+            />
             <el-button
-              class="send-button" 
+              class="send-button"
               @click="startStream(userInput, currentChatId)"
-              :disabled="isStreaming || (!userInput.trim())"
+              :disabled="isStreaming || !userInput.trim()"
             >
               <el-icon class="icon" size="large">
                 <Position />
@@ -113,43 +115,46 @@
           </div>
         </div>
       </el-main>
-
     </el-container>
   </el-container>
 </template>
 
 <script setup>
-import {ChatDotSquare, More, Position, Check, Close} from "@element-plus/icons-vue";
-
-defineOptions ({
-  name: 'AIChat'
-})
-
-import {nextTick, onMounted, ref, computed} from 'vue'
 import {
-  ChatBubbleLeftRightIcon,
-} from '@heroicons/vue/24/outline'
-import ChatMessage from '../components/ChatMessage.vue'
-import {chatAPI} from '../services/chat.js'
-import {fetchEventSource} from "@microsoft/fetch-event-source";
-import { useUserStore } from '../stores/user'
-import { ElMessage, ElMessageBox } from 'element-plus'
+  ChatDotSquare,
+  More,
+  Position,
+  Check,
+  Close,
+} from "@element-plus/icons-vue";
 
-const messagesRef = ref(null)
-const inputRef = ref(null)
-const userInput = ref('')
-const isStreaming = ref(false)
-const currentChatId = ref(null)
-const currentMessages = ref([])
-const chatHistory = ref([])
+defineOptions({
+  name: "AIChat",
+});
+
+import { nextTick, onMounted, ref, computed } from "vue";
+import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
+import ChatMessage from "../components/ChatMessage.vue";
+import { chatAPI } from "../services/chat.js";
+import { fetchEventSource } from "@microsoft/fetch-event-source";
+import { useUserStore } from "../stores/user";
+import { ElMessage, ElMessageBox } from "element-plus";
+
+const messagesRef = ref(null);
+const inputRef = ref(null);
+const userInput = ref("");
+const isStreaming = ref(false);
+const currentChatId = ref(null);
+const currentMessages = ref([]);
+const chatHistory = ref([]);
 
 // 当前 AI 正在生成的回复
-const currentResponse = ref('')
+const currentResponse = ref("");
 // TODO：对话的同时可以新建对话，并且不会影响到老对话的数据接收
 // TODO：无限滚动功能实现
 // TODO：创建新对话时起名逻辑要更改（如果是直接从对话那里，就从对话的第一个问题起名；如果是新建，就暂时用新建对话。无论如何都从输入提问的时候才真正创建新对话）
 
-const userStore = useUserStore()
+const userStore = useUserStore();
 
 // 开始新对话
 async function startNewChat() {
@@ -163,30 +168,36 @@ async function startNewChat() {
   //   title: `对话 ${newChatId.slice(-6)}`
   // }
   // chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
-  const response = await chatAPI.postCreateSession()
-  console.log("🚀🚀🚀🚀", response)
+  const response = await chatAPI.postCreateSession();
+  console.log("🚀🚀🚀🚀", response);
 }
 
 // 是否存在任一项处于编辑态
-const isAnyEditing = computed(() =>
-  Array.isArray(chatHistory.value) && chatHistory.value.some(c => c.editing !== 0)
-)
+const isAnyEditing = computed(
+  () =>
+    Array.isArray(chatHistory.value) &&
+    chatHistory.value.some((c) => c.editing !== 0),
+);
 
 // 正在提交重命名的会话ID（防重复提交）
-const renamingId = ref(null)
+const renamingId = ref(null);
 // 保存原始标题，用于取消时恢复
-const originalTitle = ref(null)
+const originalTitle = ref(null);
 
 // 进入重命名（仅允许单例编辑）
 async function renameSession(data) {
   if (Array.isArray(chatHistory.value)) {
-    chatHistory.value.forEach(c => { c.editing = 0 })
+    chatHistory.value.forEach((c) => {
+      c.editing = 0;
+    });
   }
   // 保存原始标题
-  originalTitle.value = data.title || ''
-  data.editing = 1
+  originalTitle.value = data.title || "";
+  data.editing = 1;
   await nextTick();
-  const inputEl = document.querySelector('.history-item.active .el-input__inner') || document.querySelector('.history-item .el-input__inner');
+  const inputEl =
+    document.querySelector(".history-item.active .el-input__inner") ||
+    document.querySelector(".history-item .el-input__inner");
   if (inputEl) {
     inputEl.focus();
   }
@@ -196,212 +207,209 @@ async function renameSession(data) {
 function cancelRename(chat) {
   if (chat) {
     // 恢复原始标题
-    chat.title = originalTitle.value || ''
-    chat.editing = 0
-    originalTitle.value = null
+    chat.title = originalTitle.value || "";
+    chat.editing = 0;
+    originalTitle.value = null;
   }
 }
 
 // 确认提交重命名
 async function confirmRename(chat) {
-  if (!chat || renamingId.value) return
-  renamingId.value = chat.id
+  if (!chat || renamingId.value) return;
+  renamingId.value = chat.id;
   try {
-    const response = await chatAPI.putRenameSession(chat.id, chat.title || '')
+    const response = await chatAPI.putRenameSession(chat.id, chat.title || "");
     if (response?.code === 200) {
-      chat.editing = 0
-      originalTitle.value = null
-      ElMessage.success('重命名成功！')
+      chat.editing = 0;
+      originalTitle.value = null;
+      ElMessage.success("重命名成功！");
     } else {
-      ElMessage.error(`重命名失败：${response?.msg || '未知错误'}`)
+      ElMessage.error(`重命名失败：${response?.msg || "未知错误"}`);
     }
   } catch (e) {
-    ElMessage.error('重命名失败：网络或服务器异常')
+    ElMessage.error("重命名失败：网络或服务器异常");
   } finally {
-    renamingId.value = null
-    await loadChatHistory()
+    renamingId.value = null;
+    await loadChatHistory();
   }
 }
 
 // 删除会话
 async function deleteSession(id, name) {
-  ElMessageBox.confirm(
-      `确认删除 ${name} 吗？`,
-      'warning',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      }
-  )
-      .then(() => {
-        const response = chatAPI.deleteDeleteSession(id)
-        if (response.code === 200) {
-          ElMessage({
-            type: 'success',
-            message: `删除 ${name} 成功！`,
-          })
-          loadChatHistory()
-        }
-        else {
-          ElMessage({
-            type: 'error',
-            message: `删除 ${name} 失败！请联系管理员。`,
-          })
-        }
-      })
-      .catch(() => {
+  ElMessageBox.confirm(`确认删除 ${name} 吗？`, "warning", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => {
+      const response = chatAPI.deleteDeleteSession(id);
+      if (response.code === 200) {
         ElMessage({
-          type: 'info',
-          message: '已取消删除',
-        })
-      })
+          type: "success",
+          message: `删除 ${name} 成功！`,
+        });
+        loadChatHistory();
+      } else {
+        ElMessage({
+          type: "error",
+          message: `删除 ${name} 失败！请联系管理员。`,
+        });
+      }
+    })
+    .catch(() => {
+      ElMessage({
+        type: "info",
+        message: "已取消删除",
+      });
+    });
 }
 
 // 加载聊天历史列表
 async function loadChatHistory() {
   try {
-    const response = await chatAPI.getChatHistory()
-    chatHistory.value = response.data.map(item => ({
+    const response = await chatAPI.getChatHistory();
+    chatHistory.value = response.data.map((item) => ({
       ...item,
-      editing: 0
-    }))
+      editing: 0,
+    }));
     if (response.data && response.data.length > 0) {
-      await loadChat(response.data[0].id)
+      await loadChat(response.data[0].id);
     } else {
-      startNewChat()
+      startNewChat();
     }
   } catch (error) {
-    console.error('加载聊天历史失败:', error)
-    chatHistory.value = []
-    startNewChat()
+    console.error("加载聊天历史失败:", error);
+    chatHistory.value = [];
+    startNewChat();
   }
 }
 
 // 加载特定对话
 async function loadChat(chatId) {
-  currentChatId.value = chatId
+  currentChatId.value = chatId;
   try {
-    const response = await chatAPI.getChatMessages(chatId)
-    currentMessages.value = response.data || []
-    await scrollToBottom()
+    const response = await chatAPI.getChatMessages(chatId);
+    currentMessages.value = response.data || [];
+    await scrollToBottom();
   } catch (error) {
-    console.error('加载对话消息失败:', error)
-    currentMessages.value = []
+    console.error("加载对话消息失败:", error);
+    currentMessages.value = [];
   }
 }
 
 // 发送消息（支持从输入框或直接参数触发）
 function startStream(data, sessionId) {
   // 取提示词：优先显式 data，其次输入框
-  const prompt = (typeof data === 'string' ? data : userInput.value || '').trim()
-  if (!prompt) return
+  const prompt = (
+    typeof data === "string" ? data : userInput.value || ""
+  ).trim();
+  if (!prompt) return;
 
   // 重置状态
-  currentResponse.value = ''
-  isStreaming.value = true
-  userInput.value = ''
+  currentResponse.value = "";
+  isStreaming.value = true;
+  userInput.value = "";
 
   // 将用户消息加入消息区
   currentMessages.value.push({
     senderType: 0,
-    contents: prompt
-  })
+    contents: prompt,
+  });
 
   // 为助手添加一条占位消息，边流边更新
-  const assistantIndex = currentMessages.value.length
+  const assistantIndex = currentMessages.value.length;
   currentMessages.value.push({
     senderType: 1,
-    contents: ''
-  })
+    contents: "",
+  });
 
   // 清空输入框并滚动
-  if (!data) userInput.value = ''
-  scrollToBottom()
+  if (!data) userInput.value = "";
+  scrollToBottom();
 
   // 组织请求 URL 与会话
-  const url = new URL('http://localhost/api/v1/assistant/chat')
-  const sid = sessionId || currentChatId.value
+  const url = new URL("http://localhost/api/v1/assistant/chat");
+  const sid = sessionId || currentChatId.value;
   if (sid) {
-    url.searchParams.append('session', String(sid))
+    url.searchParams.append("session", String(sid));
   }
 
-  console.log('🚀🚀🚀🚀：信息开始发送')
+  console.log("🚀🚀🚀🚀：信息开始发送");
   fetchEventSource(url, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Authorization': userStore.token,
-      'Content-Type': 'application/json'
+      Authorization: userStore.token,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      message: prompt
+      message: prompt,
     }),
     onmessage(event) {
-      if (!event.data) return
+      if (!event.data) return;
 
       // 1) 解析成纯文本
-      let chunk = event.data
+      let chunk = event.data;
       try {
-        chunk = JSON.parse(event.data)
+        chunk = JSON.parse(event.data);
       } catch (_) {
         // 非 JSON 字符串，使用原始内容
       }
 
       // 2) 规范化换行
-      if (typeof chunk !== 'string') chunk = String(chunk)
-      chunk = chunk.replace(/\r\n/g, '\n')
+      if (typeof chunk !== "string") chunk = String(chunk);
+      chunk = chunk.replace(/\r\n/g, "\n");
 
       // 3) 去掉正文中的行首 data:
-      chunk = chunk.replace(/^data:\s?/gm, '')
+      chunk = chunk.replace(/^data:\s?/gm, "");
 
       // 4) 累加到响应与占位消息
-      currentResponse.value += chunk
-      const msg = currentMessages.value[assistantIndex]
+      currentResponse.value += chunk;
+      const msg = currentMessages.value[assistantIndex];
       if (msg) {
-        msg.contents += chunk
+        msg.contents += chunk;
       }
-      nextTick(() => scrollToBottom())
+      nextTick(() => scrollToBottom());
     },
     onclose() {
-      isStreaming.value = false
+      isStreaming.value = false;
     },
     onerror(err) {
-      isStreaming.value = false
-      console.error('流式请求出错:', err)
-      throw err
-    }
-  })
+      isStreaming.value = false;
+      console.error("流式请求出错:", err);
+      throw err;
+    },
+  });
 }
 
 // 自动调整输入框高度
 async function adjustTextareaHeight() {
-  const textarea = inputRef.value
+  const textarea = inputRef.value;
   if (textarea) {
-    textarea.style.height = 'auto'
-    textarea.style.height = textarea.scrollHeight + 'px'
-  }else{
-    textarea.style.height = '50px'
+    textarea.style.height = "auto";
+    textarea.style.height = textarea.scrollHeight + "px";
+  } else {
+    textarea.style.height = "50px";
   }
 }
 
 // 滚动到底部
 async function scrollToBottom() {
-  await nextTick()
+  await nextTick();
   if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+    messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
   }
 }
 
 onMounted(() => {
-  loadChatHistory()
-  adjustTextareaHeight()
-})
+  loadChatHistory();
+  adjustTextareaHeight();
+});
 </script>
 
 <style scoped lang="scss">
 .ai-chat {
-  position: fixed;  // 修改为固定定位
-  top: 64px;       // 导航栏高度
+  position: fixed; // 修改为固定定位
+  top: 64px; // 导航栏高度
   left: 0;
   right: 0;
   bottom: 0;
@@ -417,7 +425,7 @@ onMounted(() => {
     margin: 0 auto;
     padding: 1.5rem 2rem;
     gap: 1.5rem;
-    height: 100%;    // 确保容器占满高度
+    height: 100%; // 确保容器占满高度
     overflow: hidden; // 防止容器滚动
   }
 
@@ -429,18 +437,18 @@ onMounted(() => {
     backdrop-filter: blur(10px);
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    
+
     .history-header {
-      flex-shrink: 0;  // 防止头部压缩
+      flex-shrink: 0; // 防止头部压缩
       padding: 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      
+
       h2 {
         font-size: 1.25rem;
       }
-      
+
       .new-chat {
         display: flex;
         align-items: center;
@@ -452,23 +460,23 @@ onMounted(() => {
         border: none;
         cursor: pointer;
         transition: background-color 0.3s;
-        
+
         &:hover {
           background: var(--el-color-primary-dark-2);
         }
-        
+
         .icon {
           width: 1.25rem;
           height: 1.25rem;
         }
       }
     }
-    
+
     .history-list {
       flex: 1;
-      overflow-y: auto;  // 允许历史记录滚动
+      overflow-y: auto; // 允许历史记录滚动
       padding: 0 1rem 1rem;
-      
+
       .history-item {
         min-height: 48px;
         display: flex;
@@ -478,20 +486,24 @@ onMounted(() => {
         border-radius: 0.5rem;
         cursor: pointer;
         transition: background-color 0.3s;
-        
+
         &:hover {
           background: var(--el-fill-color);
         }
-        
+
         &.active {
-          background: color-mix(in srgb, var(--el-color-primary) 10%, transparent);
+          background: color-mix(
+            in srgb,
+            var(--el-color-primary) 10%,
+            transparent
+          );
         }
-        
+
         .icon {
           width: 1.25rem;
           height: 1.25rem;
         }
-        
+
         .title {
           flex: 1;
           overflow: hidden;
@@ -504,35 +516,35 @@ onMounted(() => {
           display: flex;
           align-items: center;
           gap: 0.5rem;
-          
+
           .rename-input {
             flex: 1;
             min-width: 0;
           }
-          
+
           .rename-confirm-btn,
           .rename-cancel-btn {
             flex-shrink: 0;
             margin-left: 0 !important;
           }
-          
+
           // 覆盖 Element Plus 默认的按钮间距
           :deep(.el-button + .el-button) {
             margin-left: 0 !important;
           }
         }
 
-          .actions {
-            margin-left: auto;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.15s ease;
-          }
+        .actions {
+          margin-left: auto;
+          opacity: 0;
+          visibility: hidden;
+          transition: opacity 0.15s ease;
+        }
 
-          &:hover .actions {
-            opacity: 1;
-            visibility: visible;
-          }
+        &:hover .actions {
+          opacity: 1;
+          visibility: visible;
+        }
       }
     }
   }
@@ -545,11 +557,11 @@ onMounted(() => {
     backdrop-filter: blur(10px);
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    overflow: hidden;  // 防止内容溢出
-    
+    overflow: hidden; // 防止内容溢出
+
     .messages {
       flex: 1;
-      overflow-y: auto;  // 只允许消息区域滚动
+      overflow-y: auto; // 只允许消息区域滚动
       padding: 2rem;
       display: flex;
       flex-direction: column;
@@ -571,7 +583,7 @@ onMounted(() => {
         background: var(--el-border-color-dark);
       }
     }
-    
+
     .input-area {
       flex-shrink: 0;
       padding: 1.5rem 2rem;
@@ -586,7 +598,7 @@ onMounted(() => {
         border-radius: 0.75rem;
         padding: 0.75rem;
         border: 1px solid var(--el-border-color);
-        
+
         .file-item {
           display: flex;
           align-items: center;
@@ -597,33 +609,41 @@ onMounted(() => {
           margin-bottom: 0.75rem;
           border: 1px solid var(--el-border-color);
           transition: all 0.2s ease;
-          
+
           &:last-child {
             margin-bottom: 0;
           }
-          
+
           &:hover {
-            background: color-mix(in srgb, var(--el-color-primary) 3%, transparent);
-            border-color: color-mix(in srgb, var(--el-color-primary) 20%, var(--el-border-color));
+            background: color-mix(
+              in srgb,
+              var(--el-color-primary) 3%,
+              transparent
+            );
+            border-color: color-mix(
+              in srgb,
+              var(--el-color-primary) 20%,
+              var(--el-border-color)
+            );
           }
-          
+
           .file-info {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            
+
             .icon {
               width: 1.5rem;
               height: 1.5rem;
               color: var(--el-color-primary);
             }
-            
+
             .file-name {
               font-size: 0.875rem;
               color: var(--el-text-color-primary);
               font-weight: 500;
             }
-            
+
             .file-size {
               font-size: 0.75rem;
               color: var(--el-text-color-secondary);
@@ -632,7 +652,7 @@ onMounted(() => {
               border-radius: 1rem;
             }
           }
-          
+
           .remove-btn {
             padding: 0.375rem;
             border: none;
@@ -641,12 +661,12 @@ onMounted(() => {
             cursor: pointer;
             border-radius: 0.375rem;
             transition: all 0.2s ease;
-            
+
             &:hover {
               background: var(--el-color-danger);
               color: var(--el-color-white, #fff);
             }
-            
+
             .icon {
               width: 1.25rem;
               height: 1.25rem;
@@ -669,7 +689,7 @@ onMounted(() => {
           .hidden {
             display: none;
           }
-          
+
           .upload-btn {
             width: 2.5rem;
             height: 2.5rem;
@@ -678,20 +698,28 @@ onMounted(() => {
             justify-content: center;
             border: none;
             border-radius: 0.75rem;
-            background: color-mix(in srgb, var(--el-color-primary) 12%, transparent);
+            background: color-mix(
+              in srgb,
+              var(--el-color-primary) 12%,
+              transparent
+            );
             color: var(--el-color-primary);
             cursor: pointer;
             transition: all 0.2s ease;
-            
+
             &:hover:not(:disabled) {
-              background: color-mix(in srgb, var(--el-color-primary) 20%, transparent);
+              background: color-mix(
+                in srgb,
+                var(--el-color-primary) 20%,
+                transparent
+              );
             }
-            
+
             &:disabled {
               opacity: 0.5;
               cursor: not-allowed;
             }
-            
+
             .icon {
               width: 1.25rem;
               height: 1.25rem;
@@ -710,16 +738,16 @@ onMounted(() => {
           font-size: 1rem;
           line-height: 1.5;
           max-height: 150px;
-          
+
           &:focus {
             outline: none;
           }
-          
+
           &::placeholder {
             color: var(--el-text-color-placeholder);
           }
         }
-        
+
         .send-button {
           width: 2.5rem;
           height: 2.5rem;
@@ -732,17 +760,17 @@ onMounted(() => {
           color: var(--el-color-white, #fff);
           cursor: pointer;
           transition: all 0.2s ease;
-          
+
           &:hover:not(:disabled) {
             background: var(--el-color-primary-dark-2);
             transform: translateY(-1px);
           }
-          
+
           &:disabled {
             background: var(--el-border-color);
             cursor: not-allowed;
           }
-          
+
           .icon {
             width: 1.25rem;
             height: 1.25rem;
@@ -758,14 +786,14 @@ onMounted(() => {
     .chat-container {
       padding: 0;
     }
-    
+
     .sidebar {
       display: none; // 在移动端隐藏侧边栏
     }
-    
+
     .chat-main {
       border-radius: 0;
     }
   }
 }
-</style> 
+</style>

@@ -7,47 +7,51 @@
 
     <!-- 用户列表 -->
     <el-container>
-      <el-table
-        v-loading="loading"
-        size="large"
-        :data="users">
-          <el-table-column prop="email" label="邮箱" min-width="180" />
-          <el-table-column prop="username" label="用户名" align="center" min-width="150">
-            <template #default="scope">
-              {{ scope.row.username || '未设置' }}
-            </template>
-          </el-table-column>
-          <el-table-column label="角色" align="center" width="100">
-            <template #default="scope">
-              <span :class="['role-badge', getRole.class(scope.row.auth)]">
-                {{ getRole.name(scope.row.auth) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="创建时间" width="160" align="center">
-            <template #default="scope">
-              {{ formatDate(scope.row.createTime) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" align="center" width="90">
-            <template #default="scope">
-              <el-button
-                type="danger"
-                size="default"
-                color="#dc3545"
-                v-if="showButton(scope.row)"
-                @click="deleteUser(scope.row)">
-                删除
-              </el-button>
-            </template>
-      </el-table-column>
+      <el-table v-loading="loading" size="large" :data="users">
+        <el-table-column prop="email" label="邮箱" min-width="180" />
+        <el-table-column
+          prop="username"
+          label="用户名"
+          align="center"
+          min-width="150"
+        >
+          <template #default="scope">
+            {{ scope.row.username || "未设置" }}
+          </template>
+        </el-table-column>
+        <el-table-column label="角色" align="center" width="100">
+          <template #default="scope">
+            <span :class="['role-badge', getRole.class(scope.row.auth)]">
+              {{ getRole.name(scope.row.auth) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="160" align="center">
+          <template #default="scope">
+            {{ formatDate(scope.row.createTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center" width="90">
+          <template #default="scope">
+            <el-button
+              type="danger"
+              size="default"
+              color="#dc3545"
+              v-if="showButton(scope.row)"
+              @click="deleteUser(scope.row)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </el-container>
 
     <!-- 分页 -->
-    <el-pagination class="pagination-wrapper"
+    <el-pagination
+      class="pagination-wrapper"
       v-if="!loading && pagination"
-      size = "large"
+      size="large"
       background
       layout="prev, pager, next"
       :total="pagination.total"
@@ -55,131 +59,130 @@
       :current-page="pagination.current"
       @current-change="changePage"
     />
-
-    </el-container>
-
+  </el-container>
 </template>
 
 <script setup>
 import { ElMessage, ElMessageBox } from "element-plus";
 
 defineOptions({
-  name: 'Root'
-})
+  name: "Root",
+});
 
-import { ref, onMounted } from 'vue'
-import { RootAPI } from '../services/user.js'
+import { ref, onMounted } from "vue";
+import { RootAPI } from "../services/user.js";
 
-const users = ref([])
-const loading = ref(false)
-const error = ref(null)
-const pagination = ref(null)
-const currentPage = ref(1)
-const pageSize = ref(10)
+const users = ref([]);
+const loading = ref(false);
+const error = ref(null);
+const pagination = ref(null);
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 // 加载用户列表
 const loadUsers = async () => {
-  loading.value = true
-  error.value = null
+  loading.value = true;
+  error.value = null;
 
   try {
-    const response = await RootAPI.getAllUsers(currentPage.value, pageSize.value)
+    const response = await RootAPI.getAllUsers(
+      currentPage.value,
+      pageSize.value,
+    );
 
     if (getCode(response)) {
-      users.value = response.data.records || []
+      users.value = response.data.records || [];
 
       pagination.value = {
         current: Number(response.data.current),
         pages: Number(response.data.pages),
-        total: Number(response.data.total)
-      }
-
+        total: Number(response.data.total),
+      };
     } else {
-      error.value = response.msg
-      ElMessage.error(error.value)
+      error.value = response.msg;
+      ElMessage.error(error.value);
     }
   } catch (err) {
-    ElMessage.error('加载用户列表失败:', err)
-    error.value = '网络错误，请检查网络连接'
+    ElMessage.error("加载用户列表失败:", err);
+    error.value = "网络错误，请检查网络连接";
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 // 切换页面
 const changePage = async (page) => {
-  if (page < 1 || page > pagination.value.pages) return
+  if (page < 1 || page > pagination.value.pages) return;
 
-  currentPage.value = page
-  await loadUsers()
-}
+  currentPage.value = page;
+  await loadUsers();
+};
 
 // 删除用户
 // TODO：email需要改成name
 const deleteUser = (user) => {
   ElMessageBox.confirm(
-      `确定要删除用户 ${user?.email} 吗？此操作不可撤销。`,
-      '注意！',
-      {
-        confirmButtonText: 'OK',
-        cancelButtonText: 'Cancel',
-        type: 'warning',
-      }
+    `确定要删除用户 ${user?.email} 吗？此操作不可撤销。`,
+    "注意！",
+    {
+      confirmButtonText: "OK",
+      cancelButtonText: "Cancel",
+      type: "warning",
+    },
   )
-      // 确认删除
-      .then(async () => {
-        if (!user) return
+    // 确认删除
+    .then(async () => {
+      if (!user) return;
 
-        try {
-          const response = await RootAPI.deleteUser(user.id)
+      try {
+        const response = await RootAPI.deleteUser(user.id);
 
-          if (getCode(response)) {
-            ElMessage.success('删除成功！')
-            await loadUsers()
-          } else {
-            ElMessage.error(response.msg)
-          }
-        } catch (err) {
-          console.error('删除用户失败:', err)
+        if (getCode(response)) {
+          ElMessage.success("删除成功！");
+          await loadUsers();
+        } else {
+          ElMessage.error(response.msg);
         }
-      })
-      // 取消删除
-      .catch(() => {
-      })
-}
+      } catch (err) {
+        console.error("删除用户失败:", err);
+      }
+    })
+    // 取消删除
+    .catch(() => {});
+};
 
 // 是否显示删除按钮
 const showButton = (user) => {
-  return user.auth === 0
-}
+  return user.auth === 0;
+};
 
 // 格式化日期
 const formatDate = (dateString) => {
-  if (!dateString) return '-'
-  const date = new Date(dateString)
-  return date.toLocaleString('zh-CN')
-}
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  return date.toLocaleString("zh-CN");
+};
 
 // 获得用户权限信息
 class getRole {
   static name(auth) {
-    return auth === 1 ? '管理员' : '普通用户';
+    return auth === 1 ? "管理员" : "普通用户";
   }
 
   static class(auth) {
-    return auth === 1 ? 'admin' : 'user';
+    return auth === 1 ? "admin" : "user";
   }
 }
 
 // 返回操作码
 const getCode = (response) => {
   return response.code === 200;
-}
+};
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadUsers()
-})
+  loadUsers();
+});
 </script>
 
 <style scoped lang="scss">
@@ -214,7 +217,7 @@ onMounted(() => {
     }
 
     &.user {
-      background: #83AD50;
+      background: #83ad50;
       color: white;
     }
   }
@@ -251,7 +254,7 @@ onMounted(() => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -261,7 +264,7 @@ onMounted(() => {
       background: white;
       padding: 24px;
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       max-width: 400px;
       width: 90%;
 

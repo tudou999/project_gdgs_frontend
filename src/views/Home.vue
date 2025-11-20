@@ -1,10 +1,10 @@
 <template>
-  <div class="home" :class="{ 'dark': isDark }">
+  <div class="home" :class="{ dark: isDark }">
     <div class="container">
       <h1 class="title">卫星应用中心智能助手</h1>
       <div class="cards-grid">
-        <router-link 
-          v-for="app in aiApps" 
+        <router-link
+          v-for="app in aiApps"
           :key="app.id"
           :to="app.route"
           class="card"
@@ -22,34 +22,34 @@
 
 <script setup>
 defineOptions({
-  name: 'Home'
-})
+  name: "Home",
+});
 
-import { ref } from 'vue'
-import { useDark } from '@vueuse/core'
-import { 
+import { ref } from "vue";
+import { useDark } from "@vueuse/core";
+import {
   ChatBubbleLeftRightIcon,
-  DocumentTextIcon
-} from '@heroicons/vue/24/outline'
+  DocumentTextIcon,
+} from "@heroicons/vue/24/outline";
 
-const isDark = useDark()
+const isDark = useDark();
 
 const aiApps = ref([
   {
     id: 1,
-    title: '业务咨询',
-    description: '咨询卫星应用中心的各类问题',
-    route: '/ai-chat',
-    icon: ChatBubbleLeftRightIcon
+    title: "业务咨询",
+    description: "咨询卫星应用中心的各类问题",
+    route: "/ai-chat",
+    icon: ChatBubbleLeftRightIcon,
   },
   {
     id: 2,
-    title: '文件系统',
-    description: '更新和管理知识库文档',
-    route: '/file',
-    icon: DocumentTextIcon
-  }
-])
+    title: "文件系统",
+    description: "更新和管理知识库文档",
+    route: "/file",
+    icon: DocumentTextIcon,
+  },
+]);
 </script>
 
 <style scoped lang="scss">
@@ -69,7 +69,7 @@ const aiApps = ref([
     text-align: center;
     font-size: 2.5rem;
     margin-bottom: 3rem;
-    background: linear-gradient(45deg, #007CF0, #00DFD8);
+    background: linear-gradient(45deg, #007cf0, #00dfd8);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: fadeIn 1s ease-out;
@@ -85,7 +85,7 @@ const aiApps = ref([
     @media (min-width: 768px) {
       grid-template-columns: repeat(2, 1fr);
     }
-    
+
     @media (min-width: 1200px) {
       grid-template-columns: repeat(4, 1fr);
     }
@@ -113,7 +113,7 @@ const aiApps = ref([
     &:hover {
       transform: translateY(-5px);
       box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-      
+
       .dark & {
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
       }
@@ -130,7 +130,7 @@ const aiApps = ref([
       width: 48px;
       height: 48px;
       margin-bottom: 1rem;
-      color: #007CF0;
+      color: #007cf0;
 
       &.heart-icon {
         color: #ff4d4f;
@@ -155,10 +155,10 @@ const aiApps = ref([
 
   &.dark {
     background: #1a1a1a;
-    
+
     .card {
       background: rgba(255, 255, 255, 0.05);
-      
+
       p {
         color: #999;
       }
@@ -192,11 +192,11 @@ const aiApps = ref([
 @media (max-width: 768px) {
   .home {
     padding: 1rem;
-    
+
     .container {
       padding: 0 1rem;
     }
-    
+
     .title {
       font-size: 2rem;
     }
@@ -206,4 +206,4 @@ const aiApps = ref([
     }
   }
 }
-</style> 
+</style>

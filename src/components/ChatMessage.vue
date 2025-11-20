@@ -2,21 +2,39 @@
   <div class="message" :class="{ 'message-user': isUser }">
     <div class="avatar">
       <UserCircleIcon v-if="isUser" class="icon" />
-      <ComputerDesktopIcon v-else class="icon" :class="{ 'assistant': !isUser }" />
+      <ComputerDesktopIcon
+        v-else
+        class="icon"
+        :class="{ assistant: !isUser }"
+      />
     </div>
     <div class="content">
       <div class="text-container">
-        <button v-if="isUser" class="user-copy-button" @click="copyContent" :title="copyButtonTitle">
+        <button
+          v-if="isUser"
+          class="user-copy-button"
+          @click="copyContent"
+          :title="copyButtonTitle"
+        >
           <DocumentDuplicateIcon v-if="!copied" class="copy-icon" />
           <CheckIcon v-else class="copy-icon copied" />
         </button>
         <div class="text" ref="contentRef" v-if="isUser">
           {{ message.content }}
         </div>
-        <div class="text markdown-content" ref="contentRef" v-else v-html="processedContent"></div>
+        <div
+          class="text markdown-content"
+          ref="contentRef"
+          v-else
+          v-html="processedContent"
+        ></div>
       </div>
       <div class="message-footer" v-if="!isUser">
-        <button class="copy-button" @click="copyContent" :title="copyButtonTitle">
+        <button
+          class="copy-button"
+          @click="copyContent"
+          :title="copyButtonTitle"
+        >
           <DocumentDuplicateIcon v-if="!copied" class="copy-icon" />
           <CheckIcon v-else class="copy-icon copied" />
         </button>
@@ -26,228 +44,236 @@
 </template>
 
 <script setup>
-import { computed, onMounted, nextTick, ref, watch } from 'vue'
-import { marked } from 'marked'
-import DOMPurify from 'dompurify'
-import { UserCircleIcon, ComputerDesktopIcon, DocumentDuplicateIcon, CheckIcon } from '@heroicons/vue/24/outline'
-import hljs from 'highlight.js'
-import 'highlight.js/styles/github-dark.css'
+import { computed, onMounted, nextTick, ref, watch } from "vue";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
+import {
+  UserCircleIcon,
+  ComputerDesktopIcon,
+  DocumentDuplicateIcon,
+  CheckIcon,
+} from "@heroicons/vue/24/outline";
+import hljs from "highlight.js";
+import "highlight.js/styles/github-dark.css";
 
-const contentRef = ref(null)
-const copied = ref(false)
-const copyButtonTitle = computed(() => copied.value ? '已复制' : '复制内容')
+const contentRef = ref(null);
+const copied = ref(false);
+const copyButtonTitle = computed(() => (copied.value ? "已复制" : "复制内容"));
 
 // 配置 marked
 marked.setOptions({
   breaks: true,
   gfm: true,
-  sanitize: false
-})
+  sanitize: false,
+});
 
 // 处理内容
 const processContent = (content) => {
-  if (!content) return ''
+  if (!content) return "";
 
   // 分析内容中的 think 标签
-  let result = ''
-  let isInThinkBlock = false
-  let currentBlock = ''
+  let result = "";
+  let isInThinkBlock = false;
+  let currentBlock = "";
 
   // 逐字符分析，处理 think 标签
   for (let i = 0; i < content.length; i++) {
-    if (content.slice(i, i + 7) === '<think>') {
-      isInThinkBlock = true
+    if (content.slice(i, i + 7) === "<think>") {
+      isInThinkBlock = true;
       if (currentBlock) {
         // 将之前的普通内容转换为 HTML
-        result += marked.parse(currentBlock)
+        result += marked.parse(currentBlock);
       }
-      currentBlock = ''
-      i += 6 // 跳过 <think>
-      continue
+      currentBlock = "";
+      i += 6; // 跳过 <think>
+      continue;
     }
 
-    if (content.slice(i, i + 8) === '</think>') {
-      isInThinkBlock = false
+    if (content.slice(i, i + 8) === "</think>") {
+      isInThinkBlock = false;
       // 将 think 块包装在特殊 div 中
-      result += `<div class="think-block">${marked.parse(currentBlock)}</div>`
-      currentBlock = ''
-      i += 7 // 跳过 </think>
-      continue
+      result += `<div class="think-block">${marked.parse(currentBlock)}</div>`;
+      currentBlock = "";
+      i += 7; // 跳过 </think>
+      continue;
     }
 
-    currentBlock += content[i]
+    currentBlock += content[i];
   }
 
   // 处理剩余内容
   if (currentBlock) {
     if (isInThinkBlock) {
-      result += `<div class="think-block">${marked.parse(currentBlock)}</div>`
+      result += `<div class="think-block">${marked.parse(currentBlock)}</div>`;
     } else {
-      result += marked.parse(currentBlock)
+      result += marked.parse(currentBlock);
     }
   }
 
   // 净化处理后的 HTML
   const cleanHtml = DOMPurify.sanitize(result, {
-    ADD_TAGS: ['think', 'code', 'pre', 'span'],
-    ADD_ATTR: ['class', 'language']
-  })
-  
+    ADD_TAGS: ["think", "code", "pre", "span"],
+    ADD_ATTR: ["class", "language"],
+  });
+
   // 在净化后的 HTML 中查找代码块并添加复制按钮
-  const tempDiv = document.createElement('div')
-  tempDiv.innerHTML = cleanHtml
-  
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = cleanHtml;
+
   // 查找所有代码块
-  const preElements = tempDiv.querySelectorAll('pre')
-  preElements.forEach(pre => {
-    const code = pre.querySelector('code')
+  const preElements = tempDiv.querySelectorAll("pre");
+  preElements.forEach((pre) => {
+    const code = pre.querySelector("code");
     if (code) {
       // 创建包装器
-      const wrapper = document.createElement('div')
-      wrapper.className = 'code-block-wrapper'
-      
+      const wrapper = document.createElement("div");
+      wrapper.className = "code-block-wrapper";
+
       // 添加复制按钮
-      const copyBtn = document.createElement('button')
-      copyBtn.className = 'code-copy-button'
-      copyBtn.title = '复制代码'
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "code-copy-button";
+      copyBtn.title = "复制代码";
       copyBtn.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" class="code-copy-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
-      `
-      
+      `;
+
       // 添加成功消息
-      const successMsg = document.createElement('div')
-      successMsg.className = 'copy-success-message'
-      successMsg.textContent = '已复制!'
-      
+      const successMsg = document.createElement("div");
+      successMsg.className = "copy-success-message";
+      successMsg.textContent = "已复制!";
+
       // 组装结构
-      wrapper.appendChild(copyBtn)
-      wrapper.appendChild(pre.cloneNode(true))
-      wrapper.appendChild(successMsg)
-      
+      wrapper.appendChild(copyBtn);
+      wrapper.appendChild(pre.cloneNode(true));
+      wrapper.appendChild(successMsg);
+
       // 替换原始的 pre 元素
-      pre.parentNode.replaceChild(wrapper, pre)
+      pre.parentNode.replaceChild(wrapper, pre);
     }
-  })
-  
-  return tempDiv.innerHTML
-}
+  });
+
+  return tempDiv.innerHTML;
+};
 
 // 修改计算属性
 const processedContent = computed(() => {
-  if (!props.message.content) return ''
-  return processContent(props.message.content)
-})
+  if (!props.message.content) return "";
+  return processContent(props.message.content);
+});
 
 // 为代码块添加复制功能
 const setupCodeBlockCopyButtons = () => {
   if (!contentRef.value) return;
-  
-  const codeBlocks = contentRef.value.querySelectorAll('.code-block-wrapper');
-  codeBlocks.forEach(block => {
-    const copyButton = block.querySelector('.code-copy-button');
-    const codeElement = block.querySelector('code');
-    const successMessage = block.querySelector('.copy-success-message');
-    
+
+  const codeBlocks = contentRef.value.querySelectorAll(".code-block-wrapper");
+  codeBlocks.forEach((block) => {
+    const copyButton = block.querySelector(".code-copy-button");
+    const codeElement = block.querySelector("code");
+    const successMessage = block.querySelector(".copy-success-message");
+
     if (copyButton && codeElement) {
       // 移除旧的事件监听器
       const newCopyButton = copyButton.cloneNode(true);
       copyButton.parentNode.replaceChild(newCopyButton, copyButton);
-      
+
       // 添加新的事件监听器
-      newCopyButton.addEventListener('click', async (e) => {
+      newCopyButton.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
         try {
-          const code = codeElement.textContent || '';
+          const code = codeElement.textContent || "";
           await navigator.clipboard.writeText(code);
-          
+
           // 显示成功消息
           if (successMessage) {
-            successMessage.classList.add('visible');
+            successMessage.classList.add("visible");
             setTimeout(() => {
-              successMessage.classList.remove('visible');
+              successMessage.classList.remove("visible");
             }, 2000);
           }
         } catch (err) {
-          console.error('复制代码失败:', err);
+          console.error("复制代码失败:", err);
         }
       });
     }
   });
-}
+};
 
 // 在内容更新后手动应用高亮和设置复制按钮
 const highlightCode = async () => {
-  await nextTick()
+  await nextTick();
   if (contentRef.value) {
-    contentRef.value.querySelectorAll('pre code').forEach((block) => {
-      hljs.highlightElement(block)
-    })
-    
+    contentRef.value.querySelectorAll("pre code").forEach((block) => {
+      hljs.highlightElement(block);
+    });
+
     // 设置代码块复制按钮
-    setupCodeBlockCopyButtons()
+    setupCodeBlockCopyButtons();
   }
-}
+};
 
 const props = defineProps({
   message: {
     type: Object,
-    required: true
+    required: true,
   },
   isStreaming: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const isUser = computed(() => props.message.role === 'user')
+const isUser = computed(() => props.message.role === "user");
 
 // 复制内容到剪贴板
 const copyContent = async () => {
   try {
     // 获取纯文本内容
     let textToCopy = props.message.content;
-    
+
     // 如果是AI回复，需要去除HTML标签
     if (!isUser.value && contentRef.value) {
       // 创建临时元素来获取纯文本
-      const tempDiv = document.createElement('div');
+      const tempDiv = document.createElement("div");
       tempDiv.innerHTML = processedContent.value;
-      textToCopy = tempDiv.textContent || tempDiv.innerText || '';
+      textToCopy = tempDiv.textContent || tempDiv.innerText || "";
     }
-    
+
     await navigator.clipboard.writeText(textToCopy);
     copied.value = true;
-    
+
     // 3秒后重置复制状态
     setTimeout(() => {
       copied.value = false;
     }, 3000);
   } catch (err) {
-    console.error('复制失败:', err);
+    console.error("复制失败:", err);
   }
-}
+};
 
 // 监听内容变化
-watch(() => props.message.content, () => {
-  if (!isUser.value) {
-    highlightCode()
-  }
-})
+watch(
+  () => props.message.content,
+  () => {
+    if (!isUser.value) {
+      highlightCode();
+    }
+  },
+);
 
 // 初始化时也执行一次
 onMounted(() => {
   if (!isUser.value) {
-    highlightCode()
+    highlightCode();
   }
-})
+});
 
 const formatTime = (timestamp) => {
-  if (!timestamp) return ''
-  return new Date(timestamp).toLocaleTimeString()
-}
+  if (!timestamp) return "";
+  return new Date(timestamp).toLocaleTimeString();
+};
 </script>
 
 <style scoped lang="scss">
@@ -261,10 +287,10 @@ const formatTime = (timestamp) => {
 
     .content {
       align-items: flex-end;
-      
+
       .text-container {
         position: relative;
-        
+
         .text {
           background: var(--el-color-primary-light-9);
           color: var(--el-text-color-primary);
@@ -275,7 +301,7 @@ const formatTime = (timestamp) => {
 
         /* 用户气泡尾巴（右侧） */
         .text::after {
-          content: '';
+          content: "";
           position: absolute;
           right: -6px;
           bottom: 0.4rem;
@@ -287,7 +313,7 @@ const formatTime = (timestamp) => {
         }
 
         .text::before {
-          content: '';
+          content: "";
           position: absolute;
           right: -4px;
           bottom: 0.45rem;
@@ -297,7 +323,7 @@ const formatTime = (timestamp) => {
           border-top: 6px solid transparent;
           border-bottom: 6px solid transparent;
         }
-        
+
         .user-copy-button {
           position: absolute;
           left: -30px;
@@ -313,23 +339,23 @@ const formatTime = (timestamp) => {
           cursor: pointer;
           opacity: 0;
           transition: opacity 0.2s;
-          
+
           .copy-icon {
             width: 16px;
             height: 16px;
             color: var(--el-text-color-secondary);
-            
+
             &.copied {
               color: #4ade80;
             }
           }
         }
-        
+
         &:hover .user-copy-button {
           opacity: 1;
         }
       }
-      
+
       .message-footer {
         flex-direction: row-reverse;
       }
@@ -366,21 +392,21 @@ const formatTime = (timestamp) => {
     flex-direction: column;
     gap: 0.5rem;
     max-width: 80%;
-    
+
     .text-container {
       position: relative;
     }
-    
+
     .message-footer {
       display: flex;
       align-items: center;
       margin-top: 0.25rem;
-      
+
       .time {
         font-size: 0.75rem;
         color: var(--el-text-color-secondary);
       }
-      
+
       .copy-button {
         display: flex;
         align-items: center;
@@ -394,20 +420,20 @@ const formatTime = (timestamp) => {
         cursor: pointer;
         margin-right: auto;
         transition: background-color 0.2s;
-        
+
         &:hover {
           background-color: var(--el-fill-color-light);
         }
-        
+
         .copy-icon {
           width: 14px;
           height: 14px;
-          
+
           &.copied {
             color: #4ade80;
           }
         }
-        
+
         .copy-text {
           font-size: 0.75rem;
         }
@@ -448,10 +474,12 @@ const formatTime = (timestamp) => {
         // 添加平滑过渡效果
         opacity: 1;
         transform: translateX(0);
-        transition: opacity 0.3s ease, transform 0.3s ease;
+        transition:
+          opacity 0.3s ease,
+          transform 0.3s ease;
 
         &::before {
-          content: '思考';
+          content: "思考";
           position: absolute;
           top: -0.75rem;
           left: 1rem;
@@ -480,7 +508,14 @@ const formatTime = (timestamp) => {
         code {
           background: transparent;
           padding: 0;
-          font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+          font-family:
+            ui-monospace,
+            SFMono-Regular,
+            SF Mono,
+            Menlo,
+            Consolas,
+            Liberation Mono,
+            monospace;
           font-size: 0.9rem;
           line-height: 1.5;
           tab-size: 2;
@@ -618,11 +653,11 @@ const formatTime = (timestamp) => {
           color: var(--el-text-color-primary);
           border: 2px solid var(--el-border-color);
         }
-        
+
         .user-copy-button {
           .copy-icon {
             color: #999;
-            
+
             &.copied {
               color: #4ade80;
             }
@@ -636,10 +671,10 @@ const formatTime = (timestamp) => {
         .time {
           color: var(--el-text-color-regular);
         }
-        
+
         .copy-button {
           color: var(--el-text-color-regular);
-          
+
           &:hover {
             background-color: var(--el-fill-color);
           }
@@ -783,7 +818,6 @@ const formatTime = (timestamp) => {
 
   :deep(li) {
     margin: 0.25rem 0;
-
   }
 
   :deep(code) {
@@ -828,7 +862,7 @@ const formatTime = (timestamp) => {
     margin: 1rem 0;
     border-radius: 6px;
     overflow: hidden;
-    
+
     .code-copy-button {
       position: absolute;
       top: 0.5rem;
@@ -843,36 +877,38 @@ const formatTime = (timestamp) => {
       align-items: center;
       justify-content: center;
       opacity: 0;
-      transition: opacity 0.2s, background-color 0.2s;
+      transition:
+        opacity 0.2s,
+        background-color 0.2s;
       z-index: 10;
-      
+
       &:hover {
         background-color: var(--el-fill-color-dark);
       }
-      
+
       .code-copy-icon {
         width: 16px;
         height: 16px;
       }
     }
-    
+
     &:hover .code-copy-button {
       opacity: 0.8;
     }
-    
+
     pre {
       margin: 0;
       padding: 1rem;
       background: var(--el-fill-color-dark);
       overflow-x: auto;
-      
+
       code {
         background: transparent;
         padding: 0;
         font-family: ui-monospace, monospace;
       }
     }
-    
+
     .copy-success-message {
       position: absolute;
       top: 0.5rem;
@@ -884,10 +920,12 @@ const formatTime = (timestamp) => {
       font-size: 0.75rem;
       opacity: 0;
       transform: translateY(-10px);
-      transition: opacity 0.3s, transform 0.3s;
+      transition:
+        opacity 0.3s,
+        transform 0.3s;
       pointer-events: none;
       z-index: 20;
-      
+
       &.visible {
         opacity: 1;
         transform: translateY(0);
@@ -901,17 +939,17 @@ const formatTime = (timestamp) => {
     :deep(.code-block-wrapper) {
       .code-copy-button {
         background: var(--el-fill-color);
-        
+
         &:hover {
           background-color: var(--el-fill-color-dark);
         }
       }
-      
+
       pre {
         background: var(--el-fill-color-darker);
       }
     }
-    
+
     :deep(code) {
       background: var(--el-fill-color);
     }

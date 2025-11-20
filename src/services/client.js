@@ -1,8 +1,8 @@
-import axios from 'axios';
-import { useUserStore } from '../stores/user';
-import { ElMessage } from 'element-plus';
+import axios from "axios";
+import { useUserStore } from "../stores/user";
+import { ElMessage } from "element-plus";
 
-const BASE_URL = '/api/v1';
+const BASE_URL = "/api/v1";
 
 // 添加 token
 const addAuthHeader = (config) => {
@@ -14,7 +14,7 @@ const addAuthHeader = (config) => {
 // 统一错误处理
 const handleResponseError = (error) => {
   if (error.response?.status !== 200) {
-    ElMessage.warning('网络错误！请联系管理员');
+    ElMessage.warning("网络错误！请联系管理员");
   }
   return Promise.reject(error);
 };
@@ -23,16 +23,13 @@ const handleResponseError = (error) => {
 const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    "Content-Type": "application/json",
+  },
 });
 
 // 原始客户端
 const rawApiClient = axios.create({
   baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
 });
 
 // 请求拦截器
