@@ -78,16 +78,13 @@ export const chatAPI = {
     return apiClient.delete(`/session/${chatId}`);
   },
 
-  // 获取对话聊天记录
-  getChatMessages(chatId) {
-    // 添加类型参数
-    return apiClient.get(`/message/session/${chatId}`);
-  },
-
-  // 发送客服消息
-  sendServiceMessage(prompt, chatId) {
-    return apiClient.get(
-      `/ai/service?prompt=${encodeURIComponent(prompt)}&chatId=${chatId}`,
-    );
+  // 分页获取对话聊天记录
+  getChatMessagesByPage(chatId, pageNum = 1, pageSize = 10) {
+    return apiClient.get(`/message/session/${chatId}/page`, {
+      params: {
+        pageNum,
+        pageSize,
+      },
+    });
   },
 };

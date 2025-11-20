@@ -140,7 +140,6 @@ defineOptions({
 });
 
 const messagesRef = ref(null);
-// const inputRef = ref(null);
 const userInput = ref("");
 const isStreaming = ref(false);
 const currentChatId = ref(null);
@@ -150,7 +149,13 @@ const chatHistory = ref([]);
 // 当前 AI 正在生成的回复
 const currentResponse = ref("");
 // TODO：对话的同时可以新建对话，并且不会影响到老对话的数据接收
-// TODO：无限滚动功能实现
+
+// 分页状态（用于无限滚动加载历史消息）
+const pageNum = ref(1);
+const pageSize = ref(10);
+const total = ref(0);
+const loadingMore = ref(false);
+const hasMore = ref(true);
 
 // 开始新对话
 function startNewChat(id) {
@@ -279,16 +284,83 @@ async function loadChatHistory() {
   }
 }
 
-// 加载特定对话
+// 重置分页状态
+function resetPagination() {
+  pageNum.value = 1;
+  total.value = 0;
+  hasMore.value = true;
+}
+
+// 加载特定对话（首屏数据使用分页接口，按时间正序展示）
 async function loadChat(chatId) {
   currentChatId.value = chatId;
+  resetPagination();
   try {
-    const response = await chatAPI.getChatMessages(chatId);
-    currentMessages.value = response.data || [];
+    const response = await chatAPI.getChatMessagesByPage(
+      chatId,
+      pageNum.value,
+      pageSize.value,
+    );
+
+    const pageData = response.data || {};
+    const records = Array.isArray(pageData.records) ? pageData.records : [];
+
+    // 后端按 created 倒序，这里翻转成正序显示
+    currentMessages.value = [...records].reverse();
+    total.value = pageData.total || 0;
+    hasMore.value = pageNum.value * pageSize.value < total.value;
+
+    await nextTick();
     await scrollToBottom();
   } catch (error) {
     console.error("加载对话消息失败:", error);
     currentMessages.value = [];
+  }
+}
+
+// 在顶部加载更多历史消息
+async function loadMoreMessages() {
+  if (loadingMore.value || !hasMore.value || !currentChatId.value) return;
+  loadingMore.value = true;
+
+  try {
+    const container = messagesRef.value;
+    const previousScrollHeight = container ? container.scrollHeight : 0;
+
+    // 下一页（因为后端是按 created 倒序分页，第 1 页是最新的一页）
+    const nextPage = pageNum.value + 1;
+    const response = await chatAPI.getChatMessagesByPage(
+      currentChatId.value,
+      nextPage,
+      pageSize.value,
+    );
+
+    const pageData = response.data || {};
+    const records = Array.isArray(pageData.records) ? pageData.records : [];
+
+    if (records.length > 0) {
+      // 仍然翻转成正序，然后插入到当前消息列表前面
+      const newMessages = [...records].reverse();
+      currentMessages.value = [...newMessages, ...currentMessages.value];
+
+      pageNum.value = nextPage;
+      total.value = pageData.total || total.value;
+      hasMore.value = pageNum.value * pageSize.value < total.value;
+
+      await nextTick();
+
+      // 保持用户当前可见位置（通过调整 scrollTop）
+      if (container) {
+        const newScrollHeight = container.scrollHeight;
+        container.scrollTop = newScrollHeight - previousScrollHeight;
+      }
+    } else {
+      hasMore.value = false;
+    }
+  } catch (error) {
+    console.error("加载更多消息失败:", error);
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -369,17 +441,6 @@ async function startStream(data, sessionId) {
   });
 }
 
-// // 自动调整输入框高度
-// async function adjustTextareaHeight() {
-//   const textarea = inputRef.value;
-//   if (textarea) {
-//     textarea.style.height = "auto";
-//     textarea.style.height = textarea.scrollHeight + "px";
-//   } else {
-//     textarea.style.height = "50px";
-//   }
-// }
-
 // 滚动到底部
 async function scrollToBottom() {
   await nextTick();
@@ -388,7 +449,21 @@ async function scrollToBottom() {
   }
 }
 
+// 监听消息列表滚动，滚动到顶部时加载更多历史消息
+function handleMessagesScroll() {
+  const container = messagesRef.value;
+  if (!container || loadingMore.value || !hasMore.value) return;
+
+  const threshold = 10; // 允许 10px 误差
+  if (container.scrollTop <= threshold) {
+    loadMoreMessages();
+  }
+}
+
 onMounted(() => {
+  if (messagesRef.value) {
+    messagesRef.value.addEventListener("scroll", handleMessagesScroll);
+  }
   loadChatHistory();
 });
 </script>
