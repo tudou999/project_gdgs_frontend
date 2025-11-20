@@ -287,7 +287,12 @@ function calculateFileSize(size) {
 
 // 前往上传界面
 function gotoUpload() {
-  router.push({ name: "Upload" });
+  router.push({
+    name: "Upload",
+    query: {
+      folderId: route.query.id,
+    },
+  });
 }
 </script>
 
@@ -307,7 +312,7 @@ function gotoUpload() {
           </el-breadcrumb-item>
         </el-breadcrumb>
 
-        <!-- 文件上传界面 -->
+        <!-- 文件上传按钮（会跳转到上传界面） -->
         <el-button
           type="default"
           size="large"
