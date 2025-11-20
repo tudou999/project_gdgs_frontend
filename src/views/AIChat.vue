@@ -169,7 +169,6 @@ async function startNewChat() {
   // }
   // chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
   const response = await chatAPI.postCreateSession();
-  console.log("🚀🚀🚀🚀", response);
 }
 
 // 是否存在任一项处于编辑态
@@ -241,14 +240,14 @@ async function deleteSession(id, name) {
     cancelButtonText: "取消",
     type: "warning",
   })
-    .then(() => {
-      const response = chatAPI.deleteDeleteSession(id);
+    .then(async () => {
+      const response = await chatAPI.deleteDeleteSession(id);
       if (response.code === 200) {
         ElMessage({
           type: "success",
           message: `删除 ${name} 成功！`,
         });
-        loadChatHistory();
+        await loadChatHistory();
       } else {
         ElMessage({
           type: "error",
