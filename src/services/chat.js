@@ -6,21 +6,45 @@ const userStore = useUserStore();
 
 export const chatAPI = {
   // 发送消息并处理流式响应
-  async sendMessage(message, sessionId) {
-    // 构建URL
-    const url = new URL("http://localhost/api/v1/assistant/chat");
-    if (sessionId) url.searchParams.append("session", sessionId);
+  async sendMessage({ message, sessionId, onChunk, onFinish, onError }) {
+    const base = window.location.origin;
+    const url = new URL("/api/v1/assistant/chat", base);
 
-    // 使用fetchEventSource发送请求
-    const response = await fetchEventSource(url, {
+    if (sessionId) {
+      url.searchParams.append("session", String(sessionId));
+    }
+
+    await fetchEventSource(url, {
       method: "POST",
       headers: {
         Authorization: userStore.token,
         "Content-Type": "application/json",
-        // 接收事件流
-        Accept: "text/event-stream",
       },
       body: JSON.stringify({ message }),
+
+      onmessage(event) {
+        if (!event.data) return;
+        let chunk = event.data;
+
+        try {
+          chunk = JSON.parse(event.data);
+        } catch (_) {}
+
+        if (typeof chunk !== "string") chunk = String(chunk);
+        chunk = chunk.replace(/\r\n/g, "\n");
+        chunk = chunk.replace(/^data:\s?/gm, "");
+
+        onChunk && onChunk(chunk);
+      },
+
+      onclose() {
+        onFinish && onFinish();
+      },
+
+      onerror(err) {
+        onError && onError(err);
+        // 这里可以选择要不要 throw；如不想 fetchEventSource 自动重试，就不要再 throw
+      },
     });
   },
 
@@ -31,10 +55,10 @@ export const chatAPI = {
   },
 
   // 创建新的聊天会话
-  postCreateSession() {
+  postCreateSession(title = "新对话") {
     return apiClient.post("/session", null, {
       params: {
-        title: "新对话",
+        title: title,
       },
     });
   },

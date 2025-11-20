@@ -5,7 +5,11 @@
       <el-aside class="sidebar">
         <div class="history-header">
           <h2>聊天记录</h2>
-          <el-button size="large" @click="startNewChat()" type="primary">
+          <el-button
+            size="large"
+            @click="startNewChat(currentChatId)"
+            type="primary"
+          >
             <el-icon>
               <ChatDotSquare />
             </el-icon>
@@ -28,6 +32,7 @@
 
             <div v-else class="rename-editing">
               <el-input
+                ref="refInput"
                 v-model="chat.title"
                 size="default"
                 placeholder="请输入新标题"
@@ -96,21 +101,18 @@
         </div>
         <div class="input-area">
           <div class="input-row">
-            <textarea
+            <el-input
+              size="large"
               v-model="userInput"
-              @keydown.enter.prevent="startStream"
+              @keydown.enter.prevent="startStream(userInput, currentChatId)"
               placeholder="向CORS智能助手提问"
-              rows="1"
-              ref="inputRef"
             />
             <el-button
               class="send-button"
               @click="startStream(userInput, currentChatId)"
               :disabled="isStreaming || !userInput.trim()"
             >
-              <el-icon class="icon" size="large">
-                <Position />
-              </el-icon>
+              <el-icon class="icon" size="large"><Position /></el-icon>
             </el-button>
           </div>
         </div>
@@ -122,26 +124,23 @@
 <script setup>
 import {
   ChatDotSquare,
-  More,
-  Position,
   Check,
   Close,
+  More,
+  Position,
 } from "@element-plus/icons-vue";
+import { computed, nextTick, onMounted, ref } from "vue";
+import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
+import ChatMessage from "../components/ChatMessage.vue";
+import { chatAPI } from "../services/chat.js";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 defineOptions({
   name: "AIChat",
 });
 
-import { nextTick, onMounted, ref, computed } from "vue";
-import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
-import ChatMessage from "../components/ChatMessage.vue";
-import { chatAPI } from "../services/chat.js";
-import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { useUserStore } from "../stores/user";
-import { ElMessage, ElMessageBox } from "element-plus";
-
 const messagesRef = ref(null);
-const inputRef = ref(null);
+// const inputRef = ref(null);
 const userInput = ref("");
 const isStreaming = ref(false);
 const currentChatId = ref(null);
@@ -152,23 +151,20 @@ const chatHistory = ref([]);
 const currentResponse = ref("");
 // TODO：对话的同时可以新建对话，并且不会影响到老对话的数据接收
 // TODO：无限滚动功能实现
-// TODO：创建新对话时起名逻辑要更改（如果是直接从对话那里，就从对话的第一个问题起名；如果是新建，就暂时用新建对话。无论如何都从输入提问的时候才真正创建新对话）
-
-const userStore = useUserStore();
 
 // 开始新对话
-async function startNewChat() {
-  // const newChatId = Date.now().toString()
-  // currentChatId.value = newChatId
-  // currentMessages.value = []
-  //
-  // // 添加新对话到聊天历史列表
-  // const newChat = {
-  //   id: newChatId,
-  //   title: `对话 ${newChatId.slice(-6)}`
-  // }
-  // chatHistory.value = [newChat, ...chatHistory.value] // 将新对话添加到列表开头
-  const response = await chatAPI.postCreateSession();
+function startNewChat(id) {
+  if (id !== 0) {
+    currentChatId.value = 0;
+    currentMessages.value = [];
+  } else {
+    ElMessage.success("已经是最新对话！");
+  }
+  // 点击新对话按钮时，聚焦输入框
+  const inputEl = document.querySelector(".ai-chat .el-input__inner");
+  if (inputEl) {
+    inputEl.focus();
+  }
 }
 
 // 是否存在任一项处于编辑态
@@ -297,7 +293,7 @@ async function loadChat(chatId) {
 }
 
 // 发送消息（支持从输入框或直接参数触发）
-function startStream(data, sessionId) {
+async function startStream(data, sessionId) {
   // 取提示词：优先显式 data，其次输入框
   const prompt = (
     typeof data === "string" ? data : userInput.value || ""
@@ -324,44 +320,38 @@ function startStream(data, sessionId) {
 
   // 清空输入框并滚动
   if (!data) userInput.value = "";
-  scrollToBottom();
+  await scrollToBottom();
 
-  // 组织请求 URL 与会话
-  const url = new URL("http://localhost/api/v1/assistant/chat");
-  const sid = sessionId || currentChatId.value;
-  if (sid) {
-    url.searchParams.append("session", String(sid));
+  // 在首次向本地临时会话发送消息时，先向后端创建真实会话
+  let sid = sessionId;
+  console.log("🚀🚀🚀🚀", sid);
+  if (sid === 0) {
+    try {
+      const title = prompt.slice(0, 10);
+      const response = await chatAPI.postCreateSession(title);
+
+      const realId = response.data;
+      currentChatId.value = realId;
+      sid = realId;
+
+      const newChat = {
+        id: realId,
+        title: title,
+        editing: 0,
+      };
+      chatHistory.value = [newChat, ...chatHistory.value];
+    } catch (error) {
+      console.error("创建会话失败:", error);
+      isStreaming.value = false;
+      return;
+    }
   }
 
   console.log("🚀🚀🚀🚀：信息开始发送");
-  fetchEventSource(url, {
-    method: "POST",
-    headers: {
-      Authorization: userStore.token,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: prompt,
-    }),
-    onmessage(event) {
-      if (!event.data) return;
-
-      // 1) 解析成纯文本
-      let chunk = event.data;
-      try {
-        chunk = JSON.parse(event.data);
-      } catch (_) {
-        // 非 JSON 字符串，使用原始内容
-      }
-
-      // 2) 规范化换行
-      if (typeof chunk !== "string") chunk = String(chunk);
-      chunk = chunk.replace(/\r\n/g, "\n");
-
-      // 3) 去掉正文中的行首 data:
-      chunk = chunk.replace(/^data:\s?/gm, "");
-
-      // 4) 累加到响应与占位消息
+  await chatAPI.sendMessage({
+    message: prompt,
+    sessionId: sid,
+    onChunk(chunk) {
       currentResponse.value += chunk;
       const msg = currentMessages.value[assistantIndex];
       if (msg) {
@@ -369,27 +359,26 @@ function startStream(data, sessionId) {
       }
       nextTick(() => scrollToBottom());
     },
-    onclose() {
+    onFinish() {
       isStreaming.value = false;
     },
-    onerror(err) {
+    onError(err) {
       isStreaming.value = false;
       console.error("流式请求出错:", err);
-      throw err;
     },
   });
 }
 
-// 自动调整输入框高度
-async function adjustTextareaHeight() {
-  const textarea = inputRef.value;
-  if (textarea) {
-    textarea.style.height = "auto";
-    textarea.style.height = textarea.scrollHeight + "px";
-  } else {
-    textarea.style.height = "50px";
-  }
-}
+// // 自动调整输入框高度
+// async function adjustTextareaHeight() {
+//   const textarea = inputRef.value;
+//   if (textarea) {
+//     textarea.style.height = "auto";
+//     textarea.style.height = textarea.scrollHeight + "px";
+//   } else {
+//     textarea.style.height = "50px";
+//   }
+// }
 
 // 滚动到底部
 async function scrollToBottom() {
@@ -401,7 +390,6 @@ async function scrollToBottom() {
 
 onMounted(() => {
   loadChatHistory();
-  adjustTextareaHeight();
 });
 </script>
 
@@ -683,6 +671,25 @@ onMounted(() => {
         border-radius: 1rem;
         border: 1px solid var(--el-border-color);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+        // 让 el-input 占满剩余宽度
+        :deep(.el-input) {
+          flex: 1;
+        }
+
+        // 去掉 el-input 自己的边框和背景，只用外面的那块区域
+        :deep(.el-input__wrapper) {
+          background: transparent;
+          box-shadow: none;
+          border: none;
+          padding-left: 0;
+          padding-right: 0;
+        }
+
+        :deep(.el-input__inner) {
+          padding-left: 0;
+          padding-right: 0;
+        }
 
         .file-upload {
           .hidden {
