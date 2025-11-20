@@ -1,5 +1,4 @@
 <script setup>
-// TODO：文件上传，这里要传一个当前所在位置给文件上传组件
 import { ElMessage } from "element-plus";
 import {
   ArrowRight,
