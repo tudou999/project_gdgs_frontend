@@ -21,6 +21,7 @@ export const chatAPI = {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ message }),
+      openWhenHidden: true,
 
       onmessage(event) {
         if (!event.data) return;
