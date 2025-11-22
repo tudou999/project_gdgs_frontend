@@ -364,7 +364,11 @@ async function loadMoreMessages() {
   }
 }
 
-// 发送消息（支持从输入框或直接参数触发）
+// 打字机效果缓冲区
+const typingBuffer = ref("");
+// 打字机效果定时器
+let typingTimer = null;
+
 async function startStream(data, sessionId) {
   // 取提示词：优先显式 data，其次输入框
   const prompt = (
@@ -376,6 +380,13 @@ async function startStream(data, sessionId) {
   currentResponse.value = "";
   isStreaming.value = true;
   userInput.value = "";
+
+  // 重置打字机缓冲和定时器
+  typingBuffer.value = "";
+  if (typingTimer) {
+    clearInterval(typingTimer);
+    typingTimer = null;
+  }
 
   // 将用户消息加入消息区
   currentMessages.value.push({
@@ -396,7 +407,6 @@ async function startStream(data, sessionId) {
 
   // 在首次向本地临时会话发送消息时，先向后端创建真实会话
   let sid = sessionId;
-  console.log("🚀🚀🚀🚀", sid);
   if (sid === 0) {
     try {
       const title = prompt.slice(0, 10);
@@ -419,23 +429,51 @@ async function startStream(data, sessionId) {
     }
   }
 
-  console.log("🚀🚀🚀🚀：信息开始发送");
   await chatAPI.sendMessage({
     message: prompt,
     sessionId: sid,
     onChunk(chunk) {
-      currentResponse.value += chunk;
-      const msg = currentMessages.value[assistantIndex];
-      if (msg) {
-        msg.contents += chunk;
+      // 将新的内容加入缓冲区，由定时器按字符输出实现打字机效果
+      typingBuffer.value += chunk;
+
+      // 如果当前没有定时器，则启动定时器
+      if (!typingTimer) {
+        // 启动打字机效果定时器
+        typingTimer = setInterval(() => {
+          if (!typingBuffer.value.length) {
+            if (!isStreaming.value) {
+              clearInterval(typingTimer);
+              typingTimer = null;
+            }
+            return;
+          }
+
+          const nextChar = typingBuffer.value[0];
+          typingBuffer.value = typingBuffer.value.slice(1);
+
+          currentResponse.value += nextChar;
+          const msg = currentMessages.value[assistantIndex];
+          if (msg) {
+            msg.contents += nextChar;
+          }
+
+          nextTick(() => scrollToBottom());
+        }, 20); // 每 20ms 输出一个字符
       }
-      nextTick(() => scrollToBottom());
     },
     onFinish() {
       isStreaming.value = false;
+      if (!typingBuffer.value.length && typingTimer) {
+        clearInterval(typingTimer);
+        typingTimer = null;
+      }
     },
     onError(err) {
       isStreaming.value = false;
+      if (!typingBuffer.value.length && typingTimer) {
+        clearInterval(typingTimer);
+        typingTimer = null;
+      }
       console.error("流式请求出错:", err);
     },
   });
