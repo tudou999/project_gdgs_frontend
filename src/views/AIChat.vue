@@ -145,6 +145,8 @@ const isStreaming = ref(false);
 const currentChatId = ref(null);
 const currentMessages = ref([]);
 const chatHistory = ref([]);
+// 是否开启自动滚动到底部（仅当用户当前在底部时为 true）
+const autoScrollEnabled = ref(true);
 
 // 当前 AI 正在生成的回复
 const currentResponse = ref("");
@@ -311,7 +313,8 @@ async function loadChat(chatId) {
     hasMore.value = pageNum.value * pageSize.value < total.value;
 
     await nextTick();
-    await scrollToBottom();
+    // 首次加载对话时强制滚动到底部
+    await scrollToBottom(true);
   } catch (error) {
     console.error("加载对话消息失败:", error);
     currentMessages.value = [];
@@ -401,9 +404,9 @@ async function startStream(data, sessionId) {
     contents: "",
   });
 
-  // 清空输入框并滚动
+  // 清空输入框并滚动（发送消息时强制滚动到底部）
   if (!data) userInput.value = "";
-  await scrollToBottom();
+  await scrollToBottom(true);
 
   // 在首次向本地临时会话发送消息时，先向后端创建真实会话
   let sid = sessionId;
@@ -457,6 +460,7 @@ async function startStream(data, sessionId) {
             msg.contents += nextChar;
           }
 
+          // 仅在允许自动滚动时才滚到底部，用户向上滚动时不打扰
           nextTick(() => scrollToBottom());
         }, 20); // 每 20ms 输出一个字符
       }
@@ -480,22 +484,36 @@ async function startStream(data, sessionId) {
 }
 
 // 滚动到底部
-async function scrollToBottom() {
+// force = true 时无视 autoScrollEnabled，强制滚动到底
+async function scrollToBottom(force = false) {
   await nextTick();
-  if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
+  const container = messagesRef.value;
+  if (!container) return;
+
+  if (!force && !autoScrollEnabled.value) {
+    return;
   }
+
+  container.scrollTop = container.scrollHeight;
 }
 
-// 监听消息列表滚动，滚动到顶部时加载更多历史消息
+// 监听消息列表滚动，滚动到顶部时加载更多历史消息，并根据是否在底部切换自动滚动
 function handleMessagesScroll() {
   const container = messagesRef.value;
-  if (!container || loadingMore.value || !hasMore.value) return;
+  if (!container) return;
 
-  const threshold = 10; // 允许 10px 误差
-  if (container.scrollTop <= threshold) {
+  const thresholdTop = 10; // 顶部 10px 以内算到顶
+  const thresholdBottom = 10; // 底部 10px 以内算到底
+
+  // 顶部加载更多
+  if (!loadingMore.value && hasMore.value && container.scrollTop <= thresholdTop) {
     loadMoreMessages();
   }
+
+  // 判断是否在底部，用于控制自动滚动
+  const distanceToBottom =
+    container.scrollHeight - (container.scrollTop + container.clientHeight);
+  autoScrollEnabled.value = distanceToBottom <= thresholdBottom;
 }
 
 onMounted(() => {
