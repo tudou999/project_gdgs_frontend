@@ -188,13 +188,13 @@ async function startStream(data) {
   }
 
   currentMessages.value.push({
-    senderType: 0,
+    senderType: "USER",
     contents: prompt,
   });
 
   const assistantIndex = currentMessages.value.length;
   currentMessages.value.push({
-    senderType: 1,
+    senderType: "AI",
     contents: "",
   });
 
@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
         v-for="(message, index) in currentMessages"
         :key="index"
         :message="{
-          role: message.senderType === 0 ? 'user' : 'assistant',
+          role: message.senderType,
           content: message.contents,
         }"
       />

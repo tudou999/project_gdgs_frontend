@@ -213,7 +213,7 @@ const props = defineProps({
   },
 });
 
-const isUser = computed(() => props.message.role === "user");
+const isUser = computed(() => props.message.role === "USER");
 
 // 复制内容到剪贴板
 const copyContent = async () => {
