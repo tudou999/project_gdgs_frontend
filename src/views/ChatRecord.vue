@@ -75,7 +75,6 @@ watch(
     // 3）普通情况：正常根据 newId 加载会话
     await loadChat(newId);
   },
-  { immediate: true },
 );
 
 // 重置分页状态
@@ -198,8 +197,6 @@ async function startStream(data) {
     senderType: 1,
     contents: "",
   });
-
-  console.log("压入两条对话后的currentMessages：", currentMessages.value);
 
   if (!data) userInput.value = "";
   await scrollToBottom(true);
