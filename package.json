@@ -29,6 +29,7 @@
     "pinia": "^3.0.1",
     "sass": "^1.85.1",
     "vue": "^3.4.15",
+    "vue-renderer-markdown": "^0.0.63-beta.0",
     "vue-router": "^4.2.5"
   },
   "devDependencies": {
