@@ -26,6 +26,10 @@ const showBack = computed(() => {
   const hidden = ["/home", "/login", "/register"];
   return !hidden.includes(currentRoute.value);
 });
+// 是否显示管理员按钮
+const isAdmin = computed(() => {
+  return userStore.role === "ADMIN";
+});
 
 const handleGoHome = () => {
   router.push("/home");
@@ -47,7 +51,7 @@ const handleLogout = () => {
 };
 
 // 是否显示退出登录按钮（登录和注册页面不显示）
-const showButton = computed(() => {
+const showLogOutButton = computed(() => {
   return (
     isLoggedIn.value &&
     currentRoute.value !== "/login" &&
@@ -116,7 +120,7 @@ router.beforeEach((to, from, next) => {
           plain
           type="primary"
           size="large"
-          v-if="showButton"
+          v-if="showLogOutButton && isAdmin"
           @click="handleGoAdmin"
           title="管理员"
         >
@@ -129,7 +133,7 @@ router.beforeEach((to, from, next) => {
           plain
           type="danger"
           size="large"
-          v-if="showButton"
+          v-if="showLogOutButton"
           @click="handleLogout"
           title="退出登录"
         >

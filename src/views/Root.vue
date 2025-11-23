@@ -21,8 +21,8 @@
         </el-table-column>
         <el-table-column label="角色" align="center" width="100">
           <template #default="scope">
-            <span :class="['role-badge', getRole.class(scope.row.auth)]">
-              {{ getRole.name(scope.row.auth) }}
+            <span :class="['role-badge', scope.row.role]">
+              {{ getName(scope.row.role) }}
             </span>
           </template>
         </el-table-column>
@@ -164,15 +164,7 @@ const formatDate = (dateString) => {
 };
 
 // 获得用户权限信息
-class getRole {
-  static name(auth) {
-    return auth === 1 ? "管理员" : "普通用户";
-  }
-
-  static class(auth) {
-    return auth === 1 ? "admin" : "user";
-  }
-}
+const getName = (role) => (role === "ADMIN" ? "管理员" : "普通用户");
 
 // 返回操作码
 const getCode = (response) => {
@@ -211,12 +203,12 @@ onMounted(() => {
     font-size: 12px;
     font-weight: 500;
 
-    &.admin {
+    &.ADMIN {
       background: #883b7e;
       color: white;
     }
 
-    &.user {
+    &.USER {
       background: #83ad50;
       color: white;
     }

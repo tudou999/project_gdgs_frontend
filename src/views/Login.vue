@@ -68,6 +68,8 @@
 </template>
 
 <script setup>
+import { Hide, View } from "@element-plus/icons-vue";
+
 defineOptions({
   name: "Login",
 });
@@ -100,6 +102,7 @@ const handleLogin = async () => {
     const responseJson = await SignAPI.login(loginForm.value);
 
     if (responseJson.code === 200) {
+      userStore.setRole(responseJson.data.role);
       // 使用replace避免重复登录
       router.replace("/home");
       ElMessage.success("登录成功！");

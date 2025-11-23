@@ -4,6 +4,7 @@ import { ref } from "vue";
 export const useUserStore = defineStore("user", () => {
   // 从 localStorage 初始化 token
   const token = ref<string | null>(localStorage.getItem("token"));
+  const role = ref<string | null>(null);
 
   // 设置 token
   const setToken = (newToken: string | null) => {
@@ -21,5 +22,17 @@ export const useUserStore = defineStore("user", () => {
     token.value = null;
   };
 
-  return { token, setToken, clearToken };
+  // 设置身份
+  const setRole = (Role: string | null) => {
+    if (role) {
+      role.value = Role;
+    }
+  };
+
+  // 清除身份
+  const clearRole = () => {
+    role.value = null;
+  };
+
+  return { token, setToken, clearToken, role, setRole, clearRole };
 });
