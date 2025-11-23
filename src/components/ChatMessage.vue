@@ -1,13 +1,5 @@
 <template>
   <div class="message" :class="{ 'message-user': isUser }">
-    <div class="avatar">
-      <UserCircleIcon v-if="isUser" class="icon" />
-      <ComputerDesktopIcon
-        v-else
-        class="icon"
-        :class="{ assistant: !isUser }"
-      />
-    </div>
     <div class="content">
       <div class="text-container">
         <button
@@ -219,10 +211,6 @@ const props = defineProps({
     type: Object,
     required: true,
   },
-  isStreaming: {
-    type: Boolean,
-    default: false,
-  },
 });
 
 const isUser = computed(() => props.message.role === "user");
@@ -294,34 +282,10 @@ const formatTime = (timestamp) => {
         .text {
           background: var(--el-color-primary-light-9);
           color: var(--el-text-color-primary);
-          border-radius: 1rem 1rem 0 1rem;
-          border: 2px solid var(--el-border-color);
+          border-radius: 1.25rem; // 更圆润
+          padding: 0.75rem 1.25rem; // 调整内边距
+          border: none; // 去掉边框
           position: relative;
-        }
-
-        /* 用户气泡尾巴（右侧） */
-        .text::after {
-          content: "";
-          position: absolute;
-          right: -6px;
-          bottom: 0.4rem;
-          width: 0;
-          height: 0;
-          border-left: 6px solid var(--el-border-color);
-          border-top: 6px solid transparent;
-          border-bottom: 6px solid transparent;
-        }
-
-        .text::before {
-          content: "";
-          position: absolute;
-          right: -4px;
-          bottom: 0.45rem;
-          width: 0;
-          height: 0;
-          border-left: 6px solid var(--el-color-primary-light-9);
-          border-top: 6px solid transparent;
-          border-bottom: 6px solid transparent;
         }
 
         .user-copy-button {
@@ -390,8 +354,8 @@ const formatTime = (timestamp) => {
   .content {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    max-width: 80%;
+    gap: 0.25rem;
+    max-width: 90%; // 增加最大宽度
 
     .text-container {
       position: relative;
@@ -442,12 +406,12 @@ const formatTime = (timestamp) => {
 
     .text {
       padding: 1rem;
-      border-radius: 1rem 1rem 1rem 0;
-      line-height: 1.5;
+      border-radius: 1rem; // 统一圆角
+      line-height: 1.6; // 增加行高
       white-space: pre-wrap;
       color: var(--el-text-color-primary);
-      background: var(--el-bg-color-overlay);
-      border: 2px solid var(--el-border-color);
+      background: transparent; // 默认透明
+      border: none; // 去掉边框
       position: relative;
 
       .cursor {
@@ -649,9 +613,9 @@ const formatTime = (timestamp) => {
     &.message-user {
       .content .text-container {
         .text {
-          background: var(--el-color-primary-dark-2);
+          background: var(--el-fill-color-dark); // 深色模式下用户背景
           color: var(--el-text-color-primary);
-          border: 2px solid var(--el-border-color);
+          border: none;
         }
 
         .user-copy-button {
@@ -789,8 +753,8 @@ const formatTime = (timestamp) => {
       }
 
       &.message-user .content .text {
-        background: #0066cc;
-        color: white;
+        background: #e5e7eb; // 浅灰背景，类似 ChatGPT
+        color: #000;
       }
     }
   }

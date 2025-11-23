@@ -3,7 +3,7 @@
     <el-container class="chat-container">
       <!-- 侧边栏 -->
       <el-aside class="sidebar">
-        <div class="history-header">
+        <div class="aside-header">
           <h2>聊天记录</h2>
           <el-button
             size="large"
@@ -16,13 +16,20 @@
             新对话
           </el-button>
         </div>
-        <div class="history-list">
-          <div
+        <el-menu
+          class="history-menu"
+          :default-active="currentChatId !== null ? String(currentChatId) : ''"
+          @select="handleHistorySelect"
+        >
+          <el-menu-item
             v-for="chat in chatHistory"
             :key="chat.id"
             class="history-item"
-            :class="{ active: currentChatId === chat.id }"
-            @click="chat.editing === 0 ? loadChat(chat.id) : null"
+            :index="String(chat.id)"
+            :class="{
+              active: currentChatId === chat.id,
+              editing: chat.editing !== 0,
+            }"
           >
             <ChatBubbleLeftRightIcon class="icon" />
 
@@ -30,7 +37,7 @@
               {{ chat.title || "新对话" }}
             </span>
 
-            <div v-else class="rename-editing">
+            <div v-else class="rename-editing" @click.stop>
               <el-input
                 ref="refInput"
                 v-model="chat.title"
@@ -44,7 +51,7 @@
               <el-button
                 type="primary"
                 size="small"
-                @click="confirmRename(chat)"
+                @click.stop="confirmRename(chat)"
                 :loading="renamingId === chat.id"
                 :disabled="renamingId && renamingId !== chat.id"
                 class="rename-confirm-btn"
@@ -53,7 +60,7 @@
               </el-button>
               <el-button
                 size="small"
-                @click="cancelRename(chat)"
+                @click.stop="cancelRename(chat)"
                 :disabled="renamingId && renamingId !== chat.id"
                 class="rename-cancel-btn"
               >
@@ -61,7 +68,7 @@
               </el-button>
             </div>
 
-            <span class="actions">
+            <span class="actions" @click.stop>
               <el-dropdown size="large" trigger="click">
                 <el-button :disabled="isAnyEditing && chat.editing === 0">
                   <el-icon>
@@ -82,56 +89,30 @@
                 </template>
               </el-dropdown>
             </span>
-          </div>
-        </div>
+          </el-menu-item>
+        </el-menu>
       </el-aside>
 
-      <!-- 主区域 -->
+      <!-- 主区域：通过路由渲染具体聊天内容 -->
       <el-main class="chat-main">
-        <div class="messages" ref="messagesRef">
-          <ChatMessage
-            v-for="(message, index) in currentMessages"
-            :key="index"
-            :message="{
-              role: message.senderType === 0 ? 'user' : 'assistant',
-              content: message.contents,
-            }"
-            :is-stream="isStreaming && index === currentMessages.length - 1"
+        <router-view v-slot="{ Component }">
+          <component
+            :is="Component || ChatRecord"
+            :chat-id="String(currentChatId)"
+            @chat-created="handleChatCreated"
           />
-        </div>
-        <div class="input-area">
-          <div class="input-row">
-            <el-input
-              size="large"
-              v-model="userInput"
-              @keydown.enter.prevent="startStream(userInput, currentChatId)"
-              placeholder="向CORS智能助手提问"
-            />
-            <el-button
-              class="send-button"
-              @click="startStream(userInput, currentChatId)"
-              :disabled="isStreaming || !userInput.trim()"
-            >
-              <el-icon class="icon" size="large"><Position /></el-icon>
-            </el-button>
-          </div>
-        </div>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
 </template>
 
 <script setup>
-import {
-  ChatDotSquare,
-  Check,
-  Close,
-  More,
-  Position,
-} from "@element-plus/icons-vue";
+// TODO：在线/离线切换
+import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
-import ChatMessage from "../components/ChatMessage.vue";
+import ChatRecord from "./ChatRecord.vue";
 import { chatAPI } from "../services/chat.js";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -139,61 +120,74 @@ defineOptions({
   name: "AIChat",
 });
 
-const messagesRef = ref(null);
-const userInput = ref("");
-const isStreaming = ref(false);
-const currentChatId = ref(null);
-const currentMessages = ref([]);
-const chatHistory = ref([]);
-// 是否开启自动滚动到底部（仅当用户当前在底部时为 true）
-const autoScrollEnabled = ref(true);
+// 会话列表与当前选中状态
+const chatHistory = ref([]); // 所有会话的历史列表
+const currentChatId = ref(null); // 当前选中的会话 ID
 
-// 当前 AI 正在生成的回复
-const currentResponse = ref("");
-// TODO：对话的同时可以新建对话，并且不会影响到老对话的数据接收
+// 重命名相关状态
+const renamingId = ref(null); // 正在重命名的会话 ID
+const originalTitle = ref(null); // 进入重命名前的原始标题，用于取消恢复
 
-// 分页状态（用于无限滚动加载历史消息）
-const pageNum = ref(1);
-const pageSize = ref(10);
-const total = ref(0);
-const loadingMore = ref(false);
-const hasMore = ref(true);
-
-// 开始新对话
-function startNewChat(id) {
-  if (id !== 0) {
-    currentChatId.value = 0;
-    currentMessages.value = [];
-  } else {
-    ElMessage.success("已经是最新对话！");
-  }
-  // 点击新对话按钮时，聚焦输入框
-  const inputEl = document.querySelector(".ai-chat .el-input__inner");
-  if (inputEl) {
-    inputEl.focus();
-  }
-}
-
-// 是否存在任一项处于编辑态
+// 是否存在任意一条会话处于编辑态，用于禁用其他项的操作按钮
 const isAnyEditing = computed(
   () =>
     Array.isArray(chatHistory.value) &&
     chatHistory.value.some((c) => c.editing !== 0),
 );
 
-// 正在提交重命名的会话ID（防重复提交）
-const renamingId = ref(null);
-// 保存原始标题，用于取消时恢复
-const originalTitle = ref(null);
+// 开始新的对话（将 currentChatId 置为临时ID0，并聚焦输入框）
+function startNewChat() {
+  if (currentChatId.value === 0) {
+    ElMessage.success("当前已是最新对话！");
+  }
+  currentChatId.value = 0;
+  focusInput();
+}
 
-// 进入重命名（仅允许单例编辑）
+// 聚焦输入框
+function focusInput() {
+  // 等待下一个 DOM 更新周期后再聚焦
+  nextTick(() => {
+    const inputEl = document.querySelector(".ai-chat .el-textarea__inner");
+    if (inputEl) {
+      inputEl.focus();
+    }
+  });
+}
+
+// 点击左侧菜单时切换当前会话，重设 currentChatId
+function handleHistorySelect(index) {
+  const chatId = index;
+  if (!chatId) return;
+
+  const chat = Array.isArray(chatHistory.value)
+    ? chatHistory.value.find((item) => item.id === chatId)
+    : null;
+
+  if (!chat || chat.editing !== 0) return;
+  if (currentChatId.value === chatId) return;
+
+  currentChatId.value = chatId;
+}
+
+// 当右侧 ChatRecord 创建了一个新的会话时，更新会话列表并选中该会话
+function handleChatCreated(chat) {
+  if (!chat?.id) return;
+  const normalized = { ...chat, editing: 0 };
+  chatHistory.value = [
+    normalized,
+    ...chatHistory.value.filter((item) => item.id !== normalized.id),
+  ];
+  currentChatId.value = normalized.id;
+}
+
+// 进入重命名模式：重置其他会话的编辑状态，并记录原始标题
 async function renameSession(data) {
   if (Array.isArray(chatHistory.value)) {
     chatHistory.value.forEach((c) => {
       c.editing = 0;
     });
   }
-  // 保存原始标题
   originalTitle.value = data.title || "";
   data.editing = 1;
   await nextTick();
@@ -205,17 +199,16 @@ async function renameSession(data) {
   }
 }
 
-// 取消重命名
+// 取消重命名：恢复原始标题并退出编辑态
 function cancelRename(chat) {
   if (chat) {
-    // 恢复原始标题
     chat.title = originalTitle.value || "";
     chat.editing = 0;
     originalTitle.value = null;
   }
 }
 
-// 确认提交重命名
+// 确认提交重命名：调用后端接口更新标题，成功后刷新列表
 async function confirmRename(chat) {
   if (!chat || renamingId.value) return;
   renamingId.value = chat.id;
@@ -236,7 +229,7 @@ async function confirmRename(chat) {
   }
 }
 
-// 删除会话
+// 删除会话：弹出确认框，确认后调用后端删除，并刷新历史列表
 async function deleteSession(id, name) {
   ElMessageBox.confirm(`确认删除 ${name} 吗？`, "warning", {
     confirmButtonText: "确定",
@@ -250,6 +243,9 @@ async function deleteSession(id, name) {
           type: "success",
           message: `删除 ${name} 成功！`,
         });
+        if (currentChatId.value === id) {
+          currentChatId.value = null;
+        }
         await loadChatHistory();
       } else {
         ElMessage({
@@ -266,18 +262,22 @@ async function deleteSession(id, name) {
     });
 }
 
-// 加载聊天历史列表
+// 从后端加载会话历史列表，并为每条记录增加 editing 字段
 async function loadChatHistory() {
   try {
     const response = await chatAPI.getChatHistory();
-    chatHistory.value = response.data.map((item) => ({
-      ...item,
-      editing: 0,
-    }));
-    if (response.data && response.data.length > 0) {
-      await loadChat(response.data[0].id);
-    } else {
+    const history = Array.isArray(response.data)
+      ? response.data.map((item) => ({ ...item, editing: 0 }))
+      : [];
+    chatHistory.value = history;
+
+    if (!history.length) {
       startNewChat();
+      return;
+    }
+
+    if (!history.some((item) => item.id === currentChatId.value)) {
+      currentChatId.value = history[0].id;
     }
   } catch (error) {
     console.error("加载聊天历史失败:", error);
@@ -286,240 +286,8 @@ async function loadChatHistory() {
   }
 }
 
-// 重置分页状态
-function resetPagination() {
-  pageNum.value = 1;
-  total.value = 0;
-  hasMore.value = true;
-}
-
-// 加载特定对话（首屏数据使用分页接口，按时间正序展示）
-async function loadChat(chatId) {
-  currentChatId.value = chatId;
-  resetPagination();
-  try {
-    const response = await chatAPI.getChatMessagesByPage(
-      chatId,
-      pageNum.value,
-      pageSize.value,
-    );
-
-    const pageData = response.data || {};
-    const records = Array.isArray(pageData.records) ? pageData.records : [];
-
-    // 后端按 created 倒序，这里翻转成正序显示
-    currentMessages.value = [...records].reverse();
-    total.value = pageData.total || 0;
-    hasMore.value = pageNum.value * pageSize.value < total.value;
-
-    await nextTick();
-    // 首次加载对话时强制滚动到底部
-    await scrollToBottom(true);
-  } catch (error) {
-    console.error("加载对话消息失败:", error);
-    currentMessages.value = [];
-  }
-}
-
-// 在顶部加载更多历史消息
-async function loadMoreMessages() {
-  if (loadingMore.value || !hasMore.value || !currentChatId.value) return;
-  loadingMore.value = true;
-
-  try {
-    const container = messagesRef.value;
-    const previousScrollHeight = container ? container.scrollHeight : 0;
-
-    // 下一页（因为后端是按 created 倒序分页，第 1 页是最新的一页）
-    const nextPage = pageNum.value + 1;
-    const response = await chatAPI.getChatMessagesByPage(
-      currentChatId.value,
-      nextPage,
-      pageSize.value,
-    );
-
-    const pageData = response.data || {};
-    const records = Array.isArray(pageData.records) ? pageData.records : [];
-
-    if (records.length > 0) {
-      // 仍然翻转成正序，然后插入到当前消息列表前面
-      const newMessages = [...records].reverse();
-      currentMessages.value = [...newMessages, ...currentMessages.value];
-
-      pageNum.value = nextPage;
-      total.value = pageData.total || total.value;
-      hasMore.value = pageNum.value * pageSize.value < total.value;
-
-      await nextTick();
-
-      // 保持用户当前可见位置（通过调整 scrollTop）
-      if (container) {
-        const newScrollHeight = container.scrollHeight;
-        container.scrollTop = newScrollHeight - previousScrollHeight;
-      }
-    } else {
-      hasMore.value = false;
-    }
-  } catch (error) {
-    console.error("加载更多消息失败:", error);
-  } finally {
-    loadingMore.value = false;
-  }
-}
-
-// 打字机效果缓冲区
-const typingBuffer = ref("");
-// 打字机效果定时器
-let typingTimer = null;
-
-async function startStream(data, sessionId) {
-  // 取提示词：优先显式 data，其次输入框
-  const prompt = (
-    typeof data === "string" ? data : userInput.value || ""
-  ).trim();
-  if (!prompt) return;
-
-  // 重置状态
-  currentResponse.value = "";
-  isStreaming.value = true;
-  userInput.value = "";
-
-  // 重置打字机缓冲和定时器
-  typingBuffer.value = "";
-  if (typingTimer) {
-    clearInterval(typingTimer);
-    typingTimer = null;
-  }
-
-  // 将用户消息加入消息区
-  currentMessages.value.push({
-    senderType: 0,
-    contents: prompt,
-  });
-
-  // 为助手添加一条占位消息，边流边更新
-  const assistantIndex = currentMessages.value.length;
-  currentMessages.value.push({
-    senderType: 1,
-    contents: "",
-  });
-
-  // 清空输入框并滚动（发送消息时强制滚动到底部）
-  if (!data) userInput.value = "";
-  await scrollToBottom(true);
-
-  // 在首次向本地临时会话发送消息时，先向后端创建真实会话
-  let sid = sessionId;
-  if (sid === 0) {
-    try {
-      const title = prompt.slice(0, 10);
-      const response = await chatAPI.postCreateSession(title);
-
-      const realId = response.data;
-      currentChatId.value = realId;
-      sid = realId;
-
-      const newChat = {
-        id: realId,
-        title: title,
-        editing: 0,
-      };
-      chatHistory.value = [newChat, ...chatHistory.value];
-    } catch (error) {
-      console.error("创建会话失败:", error);
-      isStreaming.value = false;
-      return;
-    }
-  }
-
-  await chatAPI.sendMessage({
-    message: prompt,
-    sessionId: sid,
-    onChunk(chunk) {
-      // 将新的内容加入缓冲区，由定时器按字符输出实现打字机效果
-      typingBuffer.value += chunk;
-
-      // 如果当前没有定时器，则启动定时器
-      if (!typingTimer) {
-        // 启动打字机效果定时器
-        typingTimer = setInterval(() => {
-          if (!typingBuffer.value.length) {
-            if (!isStreaming.value) {
-              clearInterval(typingTimer);
-              typingTimer = null;
-            }
-            return;
-          }
-
-          const nextChar = typingBuffer.value[0];
-          typingBuffer.value = typingBuffer.value.slice(1);
-
-          currentResponse.value += nextChar;
-          const msg = currentMessages.value[assistantIndex];
-          if (msg) {
-            msg.contents += nextChar;
-          }
-
-          // 仅在允许自动滚动时才滚到底部，用户向上滚动时不打扰
-          nextTick(() => scrollToBottom());
-        }, 20); // 每 20ms 输出一个字符
-      }
-    },
-    onFinish() {
-      isStreaming.value = false;
-      if (!typingBuffer.value.length && typingTimer) {
-        clearInterval(typingTimer);
-        typingTimer = null;
-      }
-    },
-    onError(err) {
-      isStreaming.value = false;
-      if (!typingBuffer.value.length && typingTimer) {
-        clearInterval(typingTimer);
-        typingTimer = null;
-      }
-      console.error("流式请求出错:", err);
-    },
-  });
-}
-
-// 滚动到底部
-// force = true 时无视 autoScrollEnabled，强制滚动到底
-async function scrollToBottom(force = false) {
-  await nextTick();
-  const container = messagesRef.value;
-  if (!container) return;
-
-  if (!force && !autoScrollEnabled.value) {
-    return;
-  }
-
-  container.scrollTop = container.scrollHeight;
-}
-
-// 监听消息列表滚动，滚动到顶部时加载更多历史消息，并根据是否在底部切换自动滚动
-function handleMessagesScroll() {
-  const container = messagesRef.value;
-  if (!container) return;
-
-  const thresholdTop = 10; // 顶部 10px 以内算到顶
-  const thresholdBottom = 10; // 底部 10px 以内算到底
-
-  // 顶部加载更多
-  if (!loadingMore.value && hasMore.value && container.scrollTop <= thresholdTop) {
-    loadMoreMessages();
-  }
-
-  // 判断是否在底部，用于控制自动滚动
-  const distanceToBottom =
-    container.scrollHeight - (container.scrollTop + container.clientHeight);
-  autoScrollEnabled.value = distanceToBottom <= thresholdBottom;
-}
-
+// 组件挂载时拉取历史会话列表
 onMounted(() => {
-  if (messagesRef.value) {
-    messagesRef.value.addEventListener("scroll", handleMessagesScroll);
-  }
   loadChatHistory();
 });
 </script>
@@ -548,7 +316,7 @@ onMounted(() => {
   }
 
   .sidebar {
-    width: 300px;
+    width: 280px;
     display: flex;
     flex-direction: column;
     background: var(--el-bg-color-overlay);
@@ -556,60 +324,39 @@ onMounted(() => {
     border-radius: 1rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 
-    .history-header {
-      flex-shrink: 0; // 防止头部压缩
+    .aside-header {
+      flex-shrink: 0;
       padding: 1rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
 
       h2 {
-        font-size: 1.25rem;
-      }
-
-      .new-chat {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.5rem 1rem;
-        border-radius: 0.5rem;
-        background: var(--el-color-primary);
-        color: var(--el-color-white, #fff);
-        border: none;
-        cursor: pointer;
-        transition: background-color 0.3s;
-
-        &:hover {
-          background: var(--el-color-primary-dark-2);
-        }
-
-        .icon {
-          width: 1.25rem;
-          height: 1.25rem;
-        }
+        font-size: 1.1rem;
+        font-weight: 600;
       }
     }
 
-    .history-list {
+    .history-menu {
       flex: 1;
-      overflow-y: auto; // 允许历史记录滚动
-      padding: 0 1rem 1rem;
+      border-right: none;
+      background: transparent;
+      padding: 0 0.75rem 1rem;
+      overflow-y: auto;
 
-      .history-item {
-        min-height: 48px;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+      :deep(.el-menu-item) {
+        height: auto;
+        line-height: 1.4;
         padding: 0.75rem;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: background-color 0.3s;
+        margin-bottom: 0.5rem;
+        border-radius: 0.75rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        transition: background-color 0.2s;
 
+        &.is-active,
         &:hover {
-          background: var(--el-fill-color);
-        }
-
-        &.active {
           background: color-mix(
             in srgb,
             var(--el-color-primary) 10%,
@@ -617,9 +364,14 @@ onMounted(() => {
           );
         }
 
+        &.editing {
+          background: var(--el-fill-color-light);
+        }
+
         .icon {
           width: 1.25rem;
           height: 1.25rem;
+          flex-shrink: 0;
         }
 
         .title {
@@ -628,30 +380,28 @@ onMounted(() => {
           text-overflow: ellipsis;
           white-space: nowrap;
         }
+      }
+    }
 
-        .rename-editing {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
+    .new-chat {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      background: var(--el-color-primary);
+      color: var(--el-color-white, #fff);
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s;
 
-          .rename-input {
-            flex: 1;
-            min-width: 0;
-          }
+      &:hover {
+        background: var(--el-color-primary-dark-2);
+      }
 
-          .rename-confirm-btn,
-          .rename-cancel-btn {
-            flex-shrink: 0;
-            margin-left: 0 !important;
-          }
-
-          // 覆盖 Element Plus 默认的按钮间距
-          :deep(.el-button + .el-button) {
-            margin-left: 0 !important;
-          }
-        }
-
+      .icon {
+        width: 1.25rem;
+        height: 1.25rem;
         .actions {
           margin-left: auto;
           opacity: 0;
@@ -679,13 +429,20 @@ onMounted(() => {
 
     .messages {
       flex: 1;
-      overflow-y: auto; // 只允许消息区域滚动
-      padding: 2rem;
+      overflow-y: auto;
+      padding: 1rem; // 减少 padding
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 1.5rem; // 增加消息间距
 
-      /* 美化滚动条，随主题变化 */
+      // 限制消息内容宽度并居中
+      > * {
+        max-width: 48rem; // 约 768px
+        width: 100%;
+        margin: 0 auto;
+      }
+
+      /* 美化滚动条 */
       &::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -704,18 +461,27 @@ onMounted(() => {
 
     .input-area {
       flex-shrink: 0;
-      padding: 1.5rem 2rem;
-      background: var(--el-bg-color-overlay);
-      border-top: 1px solid var(--el-border-color);
+      padding: 1rem;
+      background: transparent; // 背景透明
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      align-items: center; // 居中
+
+      .input-wrapper {
+        width: 100%;
+        max-width: 48rem; // 限制宽度
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
 
       .selected-files {
-        background: var(--el-fill-color-light);
+        background: var(--el-bg-color);
         border-radius: 0.75rem;
-        padding: 0.75rem;
-        border: 1px solid var(--el-border-color);
+        padding: 0.5rem;
+        border: 1px solid var(--el-border-color-light);
+        width: 100%;
 
         .file-item {
           display: flex;
@@ -795,15 +561,22 @@ onMounted(() => {
 
       .input-row {
         display: flex;
-        gap: 1rem;
-        align-items: center;
+        gap: 0.75rem;
+        align-items: flex-end; // 底部对齐
         background: var(--el-bg-color);
         padding: 0.75rem;
-        border-radius: 1rem;
-        border: 1px solid var(--el-border-color);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        border-radius: 1.5rem; // 更大的圆角
+        border: 1px solid var(--el-border-color-light);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); // 悬浮感阴影
+        width: 100%;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
 
-        // 让 el-input 占满剩余宽度
+        &:focus-within {
+          border-color: var(--el-border-color-darker);
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
         :deep(.el-input) {
           flex: 1;
         }
@@ -869,12 +642,12 @@ onMounted(() => {
           resize: none;
           border: none;
           background: transparent;
-          padding: 0.75rem;
+          padding: 0.25rem 0.5rem; // 调整 padding
           color: inherit;
           font-family: inherit;
           font-size: 1rem;
           line-height: 1.5;
-          max-height: 150px;
+          max-height: 200px; // 增加最大高度
 
           &:focus {
             outline: none;
@@ -886,25 +659,28 @@ onMounted(() => {
         }
 
         .send-button {
-          width: 2.5rem;
-          height: 2.5rem;
+          width: 2rem; // 稍微改小一点
+          height: 2rem;
           display: flex;
           align-items: center;
           justify-content: center;
           border: none;
-          border-radius: 0.75rem;
-          background: var(--el-color-primary);
-          color: var(--el-color-white, #fff);
+          border-radius: 0.5rem; // 圆角
+          background: var(--el-text-color-primary); // 黑色背景（亮色模式）
+          color: var(--el-bg-color);
           cursor: pointer;
           transition: all 0.2s ease;
+          flex-shrink: 0;
+          margin-bottom: 0.25rem; // 对齐到底部
 
           &:hover:not(:disabled) {
-            background: var(--el-color-primary-dark-2);
-            transform: translateY(-1px);
+            background: var(--el-text-color-regular);
+            transform: none;
           }
 
           &:disabled {
-            background: var(--el-border-color);
+            background: var(--el-fill-color);
+            color: var(--el-text-color-placeholder);
             cursor: not-allowed;
           }
 
