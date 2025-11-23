@@ -6,13 +6,18 @@ const userStore = useUserStore();
 
 export const chatAPI = {
   // 发送消息并处理流式响应
-  async sendMessage({ message, sessionId, onChunk, onFinish, onError }) {
+  async sendMessage({ message, sessionId, mode, onChunk, onFinish, onError }) {
+    const Mode = {
+      LOCAL: "LOCAL",
+      ONLINE: "ONLINE",
+    };
+
+    let paramMode = mode ? Mode.ONLINE : Mode.LOCAL;
+
     const base = window.location.origin;
     const url = new URL("/api/v1/assistant/chat", base);
 
-    if (sessionId) {
-      url.searchParams.append("session", String(sessionId));
-    }
+    url.searchParams.append("session", `${sessionId}/${paramMode}`);
 
     await fetchEventSource(url, {
       method: "POST",

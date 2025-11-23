@@ -1,5 +1,5 @@
 <script setup>
-// TODO：本地/在线按钮
+// TODO：停止对话功能
 import {
   computed,
   nextTick,
@@ -47,6 +47,9 @@ let typingTimer = null; // 打字机定时器句柄，用于逐字符刷新界�
 // 会话提升状态
 const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提升到真实会话
 let lastChatId = null;
+
+// 模式（本地/在线）（false表示本地，true表示在线）
+const mode = ref(false);
 
 // 监听：当组件接收到的值改变时，根据该值加载对应会话消息
 watch(
@@ -225,6 +228,7 @@ async function startStream(data) {
   await chatAPI.sendMessage({
     message: prompt,
     sessionId: sid,
+    mode: mode.value,
     onChunk(chunk) {
       typingBuffer.value += chunk;
 
@@ -240,7 +244,6 @@ async function startStream(data) {
 
           const nextChar = typingBuffer.value[0];
           typingBuffer.value = typingBuffer.value.slice(1);
-          console.log("第二个后的currentMessages：", currentMessages.value);
 
           const msg = currentMessages.value[assistantIndex];
           if (msg) {
@@ -343,7 +346,9 @@ onBeforeUnmount(() => {
     <div class="input-area">
       <div class="input-wrapper">
         <div class="input-row">
+          <!-- TODO：暂时修改宽度，后面要优化 -->
           <el-input
+            style="max-width: 550px"
             clearable
             size="large"
             type="textarea"
@@ -353,6 +358,13 @@ onBeforeUnmount(() => {
             placeholder="给 CORS 发送消息"
             resize="none"
           />
+          <el-switch
+            v-model="mode"
+            active-text="在线"
+            inactive-text="本地"
+            size="large"
+          />
+
           <el-button
             round
             class="send-button"
