@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-// TODO：在线/离线切换
+// TODO：重命名的显示有bug
 import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";

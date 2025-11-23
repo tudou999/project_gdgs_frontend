@@ -1,5 +1,10 @@
 <script setup>
 // TODO：停止对话功能
+// TODO：重新生成会话功能
+// TODO：UI界面优化
+// TODO：添加消息时间戳显示
+// TODO：按钮禁用后回车仍能使用的bug
+
 import {
   computed,
   nextTick,
