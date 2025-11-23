@@ -197,7 +197,7 @@ defineOptions({
   name: "Register",
 });
 
-// TODO: 注册功能实现
+// TODO: 表单验证正则化
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useDark } from "@vueuse/core";
