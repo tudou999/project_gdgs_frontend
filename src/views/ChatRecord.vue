@@ -3,7 +3,7 @@
 // TODO：添加消息时间戳显示
 // TODO：按钮禁用后回车仍能使用的bug
 
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Position } from "@element-plus/icons-vue";
 import ChatMessage from "../components/ChatMessage.vue";
 import { chatAPI } from "../services/chat";
@@ -42,6 +42,9 @@ const typingBuffer = ref(""); // 打字机效果缓冲区，保存尚未输出�
 let typingTimer = null; // 打字机定时器句柄，用于逐字符刷新界面
 let activeStreamHandle = null; // 当前 fetchEventSource 句柄，用于取消流式输出
 const activeAssistantIndex = ref(null); // 正在流式输出的 AI 消息索引
+const isWaitingForChunk = computed(
+  () => isStreaming.value && typingBuffer.value.length === 0,
+); // 是否在等待下一段流式响应
 
 // 会话提升状态
 const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提升到真实会话
@@ -374,6 +377,9 @@ onBeforeUnmount(() => {
           stopped: message.stopped,
         }"
         :isStreaming="isStreaming"
+        :isWaiting="
+          isWaitingForChunk && index === activeAssistantIndex
+        "
         @regenerate="handleRegenerate"
       />
     </div>

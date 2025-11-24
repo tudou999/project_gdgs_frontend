@@ -29,8 +29,12 @@
           class="text markdown-content"
           ref="contentRef"
           v-else
-          v-html="processedContent"
-        ></div>
+        >
+          <span class="markdown-body" v-html="processedContent"></span>
+          <span v-if="showWaitingIndicator" class="waiting-ellipsis"
+            >...</span
+          >
+        </div>
       </div>
       <div v-if="!isUser && message.stopped" class="message-status stopped">
         这条消息已停止
@@ -230,9 +234,16 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isWaiting: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const isUser = computed(() => props.message.role === "USER");
+const showWaitingIndicator = computed(
+  () => !isUser.value && props.isWaiting,
+);
 
 const handleRegenerate = () => {
   if (!props.message || !props.message.content) return;
@@ -461,6 +472,10 @@ const formatTime = (timestamp) => {
       border: none; // 去掉边框
       position: relative;
 
+      .markdown-body {
+        display: inline;
+      }
+
       .cursor {
         animation: blink 1s infinite;
       }
@@ -470,6 +485,15 @@ const formatTime = (timestamp) => {
         color: var(--el-color-primary);
         font-weight: bold;
         margin-left: 2px;
+      }
+
+      .waiting-ellipsis {
+        display: inline-flex;
+        margin-left: 0.35rem;
+        font-weight: 600;
+        letter-spacing: 0.2rem;
+        color: var(--el-text-color-secondary);
+        animation: ellipsisPulse 1.2s ease-in-out infinite;
       }
 
       :deep(.think-block) {
@@ -639,6 +663,17 @@ const formatTime = (timestamp) => {
 
   50% {
     opacity: 0;
+  }
+}
+
+@keyframes ellipsisPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 1;
   }
 }
 

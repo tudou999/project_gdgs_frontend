@@ -70,8 +70,12 @@
 
             <span class="actions" @click.stop>
               <el-dropdown size="large" trigger="click">
-                <el-button :disabled="isAnyEditing && chat.editing === 0">
-                  <el-icon>
+                <el-button
+                  :disabled="isAnyEditing && chat.editing === 0"
+                  text
+                  style="padding: 0"
+                >
+                  <el-icon style="margin: 0">
                     <More />
                   </el-icon>
                 </el-button>
@@ -109,6 +113,8 @@
 
 <script setup>
 // TODO：重命名的显示有bug
+// TODO：
+
 import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
