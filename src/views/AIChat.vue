@@ -113,7 +113,6 @@
 
 <script setup>
 // TODO：重命名的显示有bug
-// TODO：
 
 import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
