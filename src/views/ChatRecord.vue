@@ -3,7 +3,14 @@
 // TODO：添加消息时间戳显示
 // TODO：按钮禁用后回车仍能使用的bug
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { Position } from "@element-plus/icons-vue";
 import ChatMessage from "../components/ChatMessage.vue";
 import { chatAPI } from "../services/chat";
@@ -41,7 +48,7 @@ const hasMore = ref(true); // 是否还有更多历史可加载
 const typingBuffer = ref(""); // 打字机效果缓冲区，保存尚未输出到界面的内容
 let typingTimer = null; // 打字机定时器句柄，用于逐字符刷新界面
 let activeStreamHandle = null; // 当前 fetchEventSource 句柄，用于取消流式输出
-const activeAssistantIndex = ref(null); // 正在流式输出的 AI 消息索引
+const activeAssistantMessage = ref(null); // 正在流式输出的 AI 消息对象
 const isWaitingForChunk = computed(
   () => isStreaming.value && typingBuffer.value.length === 0,
 ); // 是否在等待下一段流式响应
@@ -189,18 +196,20 @@ async function startStream(data) {
     typingTimer = null;
   }
 
+  // 将临时用户消息添加到当前消息列表
   currentMessages.value.push({
     senderType: "USER",
     contents: prompt,
   });
 
-  const assistantIndex = currentMessages.value.length;
+  // 将 AI 消息添加到当前消息列表，并记录当前正在流式输出的消息对象
   currentMessages.value.push({
     senderType: "AI",
     contents: "",
     stopped: false,
   });
-  activeAssistantIndex.value = assistantIndex;
+  activeAssistantMessage.value =
+    currentMessages.value[currentMessages.value.length - 1];
 
   if (!data) userInput.value = "";
   await scrollToBottom(true);
@@ -239,6 +248,8 @@ async function startStream(data) {
             if (!isStreaming.value) {
               clearInterval(typingTimer);
               typingTimer = null;
+              // 打字机内容已经全部输出完毕，可以安全清理当前流式消息引用
+              activeAssistantMessage.value = null;
             }
             return;
           }
@@ -246,7 +257,7 @@ async function startStream(data) {
           const nextChar = typingBuffer.value[0];
           typingBuffer.value = typingBuffer.value.slice(1);
 
-          const msg = currentMessages.value[assistantIndex];
+          const msg = activeAssistantMessage.value;
           if (msg) {
             msg.contents += nextChar;
           }
@@ -262,7 +273,6 @@ async function startStream(data) {
         typingTimer = null;
       }
       activeStreamHandle = null;
-      activeAssistantIndex.value = null;
     },
     onError(err) {
       isStreaming.value = false;
@@ -272,7 +282,6 @@ async function startStream(data) {
       }
       console.error("流式请求出错:", err);
       activeStreamHandle = null;
-      activeAssistantIndex.value = null;
     },
   });
 }
@@ -289,12 +298,10 @@ function stopStream() {
     clearInterval(typingTimer);
     typingTimer = null;
   }
-  if (activeAssistantIndex.value !== null) {
-    const msg = currentMessages.value[activeAssistantIndex.value];
-    if (msg) {
-      msg.stopped = true;
-    }
-    activeAssistantIndex.value = null;
+  if (activeAssistantMessage.value) {
+    const msg = activeAssistantMessage.value;
+    msg.stopped = true;
+    activeAssistantMessage.value = null;
   }
 }
 
@@ -377,9 +384,7 @@ onBeforeUnmount(() => {
           stopped: message.stopped,
         }"
         :isStreaming="isStreaming"
-        :isWaiting="
-          isWaitingForChunk && index === activeAssistantIndex
-        "
+        :isWaiting="isWaitingForChunk && message === activeAssistantMessage"
         @regenerate="handleRegenerate"
       />
     </div>
