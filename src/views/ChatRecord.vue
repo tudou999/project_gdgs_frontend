@@ -1,18 +1,10 @@
 <script setup>
 // TODO：停止对话功能
-// TODO：重新生成会话功能
 // TODO：UI界面优化
 // TODO：添加消息时间戳显示
 // TODO：按钮禁用后回车仍能使用的bug
 
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Position } from "@element-plus/icons-vue";
 import ChatMessage from "../components/ChatMessage.vue";
 import { chatAPI } from "../services/chat";
@@ -274,6 +266,14 @@ async function startStream(data) {
   });
 }
 
+// 重新生成：将选中的用户消息填回输入框并直接重新发送
+function handleRegenerate(content) {
+  if (!content || isStreaming.value) return;
+  userInput.value = content;
+  // 直接使用这段内容重新开始一次流式对话
+  startStream(content);
+}
+
 // 滚动到底部
 async function scrollToBottom(force = false) {
   await nextTick();
@@ -343,6 +343,8 @@ onBeforeUnmount(() => {
           role: message.senderType,
           content: message.contents,
         }"
+        :isStreaming="isStreaming"
+        @regenerate="handleRegenerate"
       />
     </div>
     <div class="input-area">

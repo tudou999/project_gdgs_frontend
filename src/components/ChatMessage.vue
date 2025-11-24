@@ -2,15 +2,26 @@
   <div class="message" :class="{ 'message-user': isUser }">
     <div class="content">
       <div class="text-container">
-        <button
-          v-if="isUser"
-          class="user-copy-button"
-          @click="copyContent"
-          :title="copyButtonTitle"
-        >
-          <DocumentDuplicateIcon v-if="!copied" class="copy-icon" />
-          <CheckIcon v-else class="copy-icon copied" />
-        </button>
+        <template v-if="isUser">
+          <el-button
+            class="user-regenerate-button"
+            type="text"
+            @click="handleRegenerate"
+            title="重新生成"
+            :disabled="props.isStreaming"
+            round
+          >
+            <ArrowPathIcon class="copy-icon" />
+          </el-button>
+          <button
+            class="user-copy-button"
+            @click="copyContent"
+            :title="copyButtonTitle"
+          >
+            <DocumentDuplicateIcon v-if="!copied" class="copy-icon" />
+            <CheckIcon v-else class="copy-icon copied" />
+          </button>
+        </template>
         <div class="text" ref="contentRef" v-if="isUser">
           {{ message.content }}
         </div>
@@ -40,13 +51,14 @@ import { computed, onMounted, nextTick, ref, watch } from "vue";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import {
-  UserCircleIcon,
-  ComputerDesktopIcon,
   DocumentDuplicateIcon,
   CheckIcon,
+  ArrowPathIcon,
 } from "@heroicons/vue/24/outline";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
+
+const emit = defineEmits(["regenerate"]);
 
 const contentRef = ref(null);
 const copied = ref(false);
@@ -211,9 +223,18 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  isStreaming: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const isUser = computed(() => props.message.role === "USER");
+
+const handleRegenerate = () => {
+  if (!props.message || !props.message.content) return;
+  emit("regenerate", props.message.content);
+};
 
 // 复制内容到剪贴板
 const copyContent = async () => {
@@ -288,11 +309,11 @@ const formatTime = (timestamp) => {
           position: relative;
         }
 
-        .user-copy-button {
+        // 用户侧的复制/重新生成按钮：样式完全一致，只是图标和点击逻辑不同
+        .user-copy-button,
+        .user-regenerate-button {
           position: absolute;
           left: -30px;
-          top: 50%;
-          transform: translateY(-50%);
           background: transparent;
           border: none;
           width: 24px;
@@ -303,6 +324,12 @@ const formatTime = (timestamp) => {
           cursor: pointer;
           opacity: 0;
           transition: opacity 0.2s;
+
+          &:disabled {
+            background: var(--el-fill-color);
+            color: var(--el-text-color-placeholder);
+            cursor: not-allowed;
+          }
 
           .copy-icon {
             width: 16px;
@@ -315,7 +342,24 @@ const formatTime = (timestamp) => {
           }
         }
 
-        &:hover .user-copy-button {
+        // 两个按钮在垂直方向居中，水平方向左右并排
+        .user-regenerate-button,
+        .user-copy-button {
+          top: 50%;
+          transform: translateY(-50%);
+        }
+
+        // 重新生成按钮更靠外侧，复制按钮更靠近气泡
+        .user-regenerate-button {
+          left: -60px;
+        }
+
+        .user-copy-button {
+          left: -30px;
+        }
+
+        &:hover .user-copy-button,
+        &:hover .user-regenerate-button {
           opacity: 1;
         }
       }
@@ -618,7 +662,8 @@ const formatTime = (timestamp) => {
           border: none;
         }
 
-        .user-copy-button {
+        .user-copy-button,
+        .user-regenerate-button {
           .copy-icon {
             color: #999;
 
