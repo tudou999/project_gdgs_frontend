@@ -1,5 +1,4 @@
 <script setup>
-// TODO：停止对话功能
 // TODO：UI界面优化
 // TODO：添加消息时间戳显示
 // TODO：按钮禁用后回车仍能使用的bug
@@ -8,6 +7,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { Position } from "@element-plus/icons-vue";
 import ChatMessage from "../components/ChatMessage.vue";
 import { chatAPI } from "../services/chat";
+import IconStop from "../components/icons/IconStop.vue";
 
 defineOptions({
   name: "ChatRecord",
@@ -40,6 +40,8 @@ const loadingMore = ref(false); // 是否正在加载上一页历史，避免重
 const hasMore = ref(true); // 是否还有更多历史可加载
 const typingBuffer = ref(""); // 打字机效果缓冲区，保存尚未输出到界面的内容
 let typingTimer = null; // 打字机定时器句柄，用于逐字符刷新界面
+let activeStreamHandle = null; // 当前 fetchEventSource 句柄，用于取消流式输出
+const activeAssistantIndex = ref(null); // 正在流式输出的 AI 消息索引
 
 // 会话提升状态
 const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提升到真实会话
@@ -193,7 +195,9 @@ async function startStream(data) {
   currentMessages.value.push({
     senderType: "AI",
     contents: "",
+    stopped: false,
   });
+  activeAssistantIndex.value = assistantIndex;
 
   if (!data) userInput.value = "";
   await scrollToBottom(true);
@@ -219,7 +223,7 @@ async function startStream(data) {
   }
 
   // 通过缓冲区 + 定时器实现打字机效果
-  await chatAPI.sendMessage({
+  activeStreamHandle = chatAPI.sendMessage({
     message: prompt,
     sessionId: sid,
     mode: mode.value,
@@ -254,6 +258,8 @@ async function startStream(data) {
         clearInterval(typingTimer);
         typingTimer = null;
       }
+      activeStreamHandle = null;
+      activeAssistantIndex.value = null;
     },
     onError(err) {
       isStreaming.value = false;
@@ -262,8 +268,31 @@ async function startStream(data) {
         typingTimer = null;
       }
       console.error("流式请求出错:", err);
+      activeStreamHandle = null;
+      activeAssistantIndex.value = null;
     },
   });
+}
+
+// 停止当前流式输出
+function stopStream() {
+  if (activeStreamHandle) {
+    activeStreamHandle.cancel();
+    activeStreamHandle = null;
+  }
+  isStreaming.value = false;
+  typingBuffer.value = "";
+  if (typingTimer) {
+    clearInterval(typingTimer);
+    typingTimer = null;
+  }
+  if (activeAssistantIndex.value !== null) {
+    const msg = currentMessages.value[activeAssistantIndex.value];
+    if (msg) {
+      msg.stopped = true;
+    }
+    activeAssistantIndex.value = null;
+  }
 }
 
 // 重新生成：将选中的用户消息填回输入框并直接重新发送
@@ -342,6 +371,7 @@ onBeforeUnmount(() => {
         :message="{
           role: message.senderType,
           content: message.contents,
+          stopped: message.stopped,
         }"
         :isStreaming="isStreaming"
         @regenerate="handleRegenerate"
@@ -372,10 +402,15 @@ onBeforeUnmount(() => {
           <el-button
             round
             class="send-button"
-            @click="startStream(userInput)"
-            :disabled="isStreaming || !userInput.trim()"
+            @click="isStreaming ? stopStream() : startStream(userInput)"
+            :disabled="!isStreaming && !userInput.trim()"
           >
-            <el-icon class="icon" size="small"><Position /></el-icon>
+            <template v-if="isStreaming">
+              <IconStop class="icon-stop" />
+            </template>
+            <template v-else>
+              <el-icon class="icon-send" size="small"><Position /></el-icon>
+            </template>
           </el-button>
         </div>
       </div>
@@ -501,9 +536,14 @@ onBeforeUnmount(() => {
         cursor: not-allowed;
       }
 
-      .icon {
+      .icon-send {
         width: 1.25rem;
         height: 1.25rem;
+      }
+
+      .icon-stop {
+        width: 1rem;
+        height: 1rem;
       }
     }
   }

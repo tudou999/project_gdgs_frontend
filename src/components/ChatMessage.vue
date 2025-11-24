@@ -32,6 +32,9 @@
           v-html="processedContent"
         ></div>
       </div>
+      <div v-if="!isUser && message.stopped" class="message-status stopped">
+        这条消息已停止
+      </div>
       <div class="message-footer" v-if="!isUser">
         <button
           class="copy-button"
@@ -613,6 +616,16 @@ const formatTime = (timestamp) => {
 
       :deep(.hljs-variable) {
         color: #e36209;
+      }
+    }
+
+    .message-status {
+      font-size: 0.75rem;
+      margin-top: 0.25rem;
+      color: var(--el-text-color-secondary);
+
+      &.stopped {
+        color: var(--el-text-color-secondary);
       }
     }
   }

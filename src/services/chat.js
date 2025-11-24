@@ -5,8 +5,8 @@ import { apiClient } from "./client";
 const userStore = useUserStore();
 
 export const chatAPI = {
-  // 发送消息并处理流式响应
-  async sendMessage({ message, sessionId, mode, onChunk, onFinish, onError }) {
+  // 发送消息并处理流式响应（返回用于取消的句柄）
+  sendMessage({ message, sessionId, mode, onChunk, onFinish, onError }) {
     const Mode = {
       LOCAL: "LOCAL",
       ONLINE: "ONLINE",
@@ -19,7 +19,9 @@ export const chatAPI = {
 
     url.searchParams.append("session", `${sessionId}/${paramMode}`);
 
-    await fetchEventSource(url, {
+    const controller = new AbortController();
+
+    const finished = fetchEventSource(url, {
       method: "POST",
       headers: {
         Authorization: userStore.token,
@@ -27,6 +29,7 @@ export const chatAPI = {
       },
       body: JSON.stringify({ message }),
       openWhenHidden: true,
+      signal: controller.signal,
 
       onmessage(event) {
         if (!event.data) return;
@@ -52,6 +55,11 @@ export const chatAPI = {
         // 这里可以选择要不要 throw；如不想 fetchEventSource 自动重试，就不要再 throw
       },
     });
+
+    return {
+      cancel: () => controller.abort(),
+      finished,
+    };
   },
 
   // 获取聊天历史列表
