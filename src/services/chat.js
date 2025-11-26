@@ -8,16 +8,16 @@ export const chatAPI = {
   // 发送消息并处理流式响应（返回用于取消的句柄）
   sendMessage({ message, sessionId, mode, onChunk, onFinish, onError }) {
     const Mode = {
-      LOCAL: "LOCAL",
-      ONLINE: "ONLINE",
+      local: "local",
+      online: "online",
     };
 
-    let paramMode = mode ? Mode.ONLINE : Mode.LOCAL;
+    let paramMode = mode ? Mode.online : Mode.local;
 
     const base = window.location.origin;
-    const url = new URL("/api/v1/assistant/chat", base);
+    const url = new URL(`/api/v1/assistant/${paramMode}/chat`, base);
 
-    url.searchParams.append("session", `${sessionId}/${paramMode}`);
+    url.searchParams.append("sessionId", sessionId);
 
     const controller = new AbortController();
 
@@ -27,7 +27,10 @@ export const chatAPI = {
         Authorization: userStore.token,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({
+        message: message,
+        sessionId: sessionId,
+      }),
       openWhenHidden: true,
       signal: controller.signal,
 
@@ -65,39 +68,35 @@ export const chatAPI = {
   // 获取聊天历史列表
   getChatHistory() {
     // 添加类型参数
-    return apiClient.get("/session");
+    return apiClient.get("/sessions");
   },
 
   // 创建新的聊天会话
   postCreateSession(title = "新对话") {
-    return apiClient.post("/session", null, {
-      params: {
-        title: title,
-      },
+    return apiClient.post("/sessions", {
+      title: title,
     });
   },
 
   // 重命名聊天会话
-  putRenameSession(chatId, name) {
-    return apiClient.put(`/session`, null, {
-      params: {
-        id: chatId,
-        title: name,
-      },
+  patchRenameSession(chatId, name) {
+    return apiClient.patch(`/sessions/${chatId}`, {
+      title: name,
     });
   },
 
   // 删除聊天会话
   deleteDeleteSession(chatId) {
-    return apiClient.delete(`/session/${chatId}`);
+    return apiClient.delete(`/sessions/${chatId}`);
   },
 
   // 分页获取对话聊天记录
   getChatMessagesByPage(chatId, pageNum = 1, pageSize = 10) {
-    return apiClient.get(`/message/session/${chatId}/page`, {
+    return apiClient.get(`/messages`, {
       params: {
-        pageNum,
-        pageSize,
+        sessionId: chatId,
+        pageNum: pageNum,
+        pageSize: pageSize,
       },
     });
   },
