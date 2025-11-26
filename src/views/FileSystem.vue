@@ -232,7 +232,7 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
   } else if (editing === 2) {
     if (renamingId.value) return;
     renamingId.value = checkedId;
-    const responseJson = await fileAPI.putRenameFile(checkedId, name);
+    const responseJson = await fileAPI.patchRenameFile(checkedId, name);
     try {
       if (responseJson.code === 200) {
         await reloadContent();
