@@ -218,7 +218,10 @@ async function confirmRename(chat) {
   if (!chat || renamingId.value) return;
   renamingId.value = chat.id;
   try {
-    const response = await chatAPI.putRenameSession(chat.id, chat.title || "");
+    const response = await chatAPI.patchRenameSession(
+      chat.id,
+      chat.title || "",
+    );
     if (response?.code === 200) {
       chat.editing = 0;
       originalTitle.value = null;

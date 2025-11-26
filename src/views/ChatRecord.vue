@@ -199,13 +199,13 @@ async function startStream(data) {
   // 将临时用户消息添加到当前消息列表
   currentMessages.value.push({
     senderType: "USER",
-    contents: prompt,
+    content: prompt,
   });
 
   // 将 AI 消息添加到当前消息列表，并记录当前正在流式输出的消息对象
   currentMessages.value.push({
     senderType: "AI",
-    contents: "",
+    content: "",
     stopped: false,
   });
   activeAssistantMessage.value =
@@ -259,7 +259,7 @@ async function startStream(data) {
 
           const msg = activeAssistantMessage.value;
           if (msg) {
-            msg.contents += nextChar;
+            msg.content += nextChar;
           }
 
           nextTick(() => scrollToBottom());
@@ -380,7 +380,7 @@ onBeforeUnmount(() => {
         :key="index"
         :message="{
           role: message.senderType,
-          content: message.contents,
+          content: message.content,
           stopped: message.stopped,
         }"
         :isStreaming="isStreaming"
