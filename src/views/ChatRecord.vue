@@ -1,7 +1,6 @@
 <script setup>
 // TODO：UI界面优化
 // TODO：添加消息时间戳显示
-// TODO：按钮禁用后回车仍能使用的bug
 
 import {
   computed,
@@ -15,6 +14,7 @@ import { Position } from "@element-plus/icons-vue";
 import ChatMessage from "../components/ChatMessage.vue";
 import { chatAPI } from "../services/chat";
 import IconStop from "../components/icons/IconStop.vue";
+import { ElMessage } from "element-plus";
 
 defineOptions({
   name: "ChatRecord",
@@ -178,6 +178,15 @@ async function loadMoreMessages() {
   } finally {
     loadingMore.value = false;
   }
+}
+
+// 处理回车发送，需与按钮禁用逻辑保持一致
+function handleInputEnter() {
+  if (isStreaming.value || !userInput.value.trim()) {
+    ElMessage.error("当前正在发送信息，请稍后再试！");
+    return;
+  }
+  startStream(userInput.value);
 }
 
 // 开始流式发送消息
@@ -399,7 +408,7 @@ onBeforeUnmount(() => {
             type="textarea"
             :autosize="{ minRows: 1, maxRows: 6 }"
             v-model="userInput"
-            @keydown.enter.prevent="startStream(userInput)"
+            @keydown.enter.prevent="handleInputEnter"
             placeholder="给 CORS 发送消息"
             resize="none"
           />
