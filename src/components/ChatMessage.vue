@@ -6,7 +6,7 @@
           <el-button
             class="user-regenerate-button"
             type="text"
-            @click="handleRegenerate"
+            @click="clickRegenerate"
             title="重新生成"
             :disabled="props.isStreaming"
             round
@@ -25,22 +25,18 @@
         <div class="text" ref="contentRef" v-if="isUser">
           {{ message.content }}
         </div>
-        <div
-          class="text markdown-content"
-          ref="contentRef"
-          v-else
-        >
+        <div class="text markdown-content" ref="contentRef" v-else>
           <span class="markdown-body" v-html="processedContent"></span>
-          <span v-if="showWaitingIndicator" class="waiting-ellipsis"
-            >...</span
-          >
+          <span v-if="showWaitingIndicator" class="waiting-ellipsis">...</span>
         </div>
       </div>
       <div v-if="!isUser && message.stopped" class="message-status stopped">
         这条消息已停止
       </div>
-      <div class="message-footer" v-if="!isUser">
+      <div class="message-footer">
+        <span class="time">{{ formatTime(message.createdAt) }}</span>
         <button
+          v-if="!isUser"
           class="copy-button"
           @click="copyContent"
           :title="copyButtonTitle"
@@ -64,12 +60,35 @@ import {
 } from "@heroicons/vue/24/outline";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
-
+const props = defineProps({
+  message: {
+    type: Object,
+    required: true,
+  },
+  isStreaming: {
+    type: Boolean,
+    default: false,
+  },
+  isWaiting: {
+    type: Boolean,
+    default: false,
+  },
+});
 const emit = defineEmits(["regenerate"]);
 
+/* 响应式数据 */
+// 引用消息内容的 DOM 元素
 const contentRef = ref(null);
+// 复制状态
 const copied = ref(false);
+
+/* 计算属性 */
+// 计算复制按钮的标题
 const copyButtonTitle = computed(() => (copied.value ? "已复制" : "复制内容"));
+// 计算当前消息是否为用户消息
+const isUser = computed(() => props.message.role === "USER");
+// 计算显示省略号
+const showWaitingIndicator = computed(() => !isUser.value && props.isWaiting);
 
 // 配置 marked
 marked.setOptions({
@@ -195,7 +214,7 @@ const setupCodeBlockCopyButtons = () => {
         e.stopPropagation();
         try {
           const code = codeElement.textContent || "";
-          await navigator.clipboard.writeText(code);
+          await copyToClipboard(code);
 
           // 显示成功消息
           if (successMessage) {
@@ -225,29 +244,37 @@ const highlightCode = async () => {
   }
 };
 
-const props = defineProps({
-  message: {
-    type: Object,
-    required: true,
-  },
-  isStreaming: {
-    type: Boolean,
-    default: false,
-  },
-  isWaiting: {
-    type: Boolean,
-    default: false,
-  },
-});
-
-const isUser = computed(() => props.message.role === "USER");
-const showWaitingIndicator = computed(
-  () => !isUser.value && props.isWaiting,
-);
-
-const handleRegenerate = () => {
+// 点击重新生成按钮
+const clickRegenerate = () => {
   if (!props.message || !props.message.content) return;
   emit("regenerate", props.message.content);
+};
+
+// 复制函数
+const copyToClipboard = async (text) => {
+  // 使用 document.execCommand
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+
+  // 确保 textarea 不可见但仍在文档流中
+  textArea.style.position = "fixed";
+  textArea.style.left = "-9999px";
+  textArea.style.top = "0";
+
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    if (!successful) {
+      throw new Error("Copy command failed");
+    }
+  } catch (err) {
+    document.body.removeChild(textArea);
+    throw err;
+  }
 };
 
 // 复制内容到剪贴板
@@ -256,15 +283,7 @@ const copyContent = async () => {
     // 获取纯文本内容
     let textToCopy = props.message.content;
 
-    // 如果是AI回复，需要去除HTML标签
-    if (!isUser.value && contentRef.value) {
-      // 创建临时元素来获取纯文本
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = processedContent.value;
-      textToCopy = tempDiv.textContent || tempDiv.innerText || "";
-    }
-
-    await navigator.clipboard.writeText(textToCopy);
+    await copyToClipboard(textToCopy);
     copied.value = true;
 
     // 3秒后重置复制状态
@@ -295,7 +314,7 @@ onMounted(() => {
 
 const formatTime = (timestamp) => {
   if (!timestamp) return "";
-  return new Date(timestamp).toLocaleTimeString();
+  return new Date(timestamp).toLocaleString();
 };
 </script>
 

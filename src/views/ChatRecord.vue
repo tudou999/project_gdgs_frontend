@@ -1,6 +1,5 @@
 <script setup>
 // TODO：UI界面优化
-// TODO：添加消息时间戳显示
 
 import {
   computed,
@@ -391,6 +390,7 @@ onBeforeUnmount(() => {
           role: message.senderType,
           content: message.content,
           stopped: message.stopped,
+          createdAt: message.created,
         }"
         :isStreaming="isStreaming"
         :isWaiting="isWaitingForChunk && message === activeAssistantMessage"
