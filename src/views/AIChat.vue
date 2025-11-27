@@ -48,24 +48,26 @@
                 :disabled="renamingId && renamingId !== chat.id"
                 class="rename-input"
               />
-              <el-button
-                type="primary"
-                size="small"
-                @click.stop="confirmRename(chat)"
-                :loading="renamingId === chat.id"
-                :disabled="renamingId && renamingId !== chat.id"
-                class="rename-confirm-btn"
-              >
-                <el-icon><Check /></el-icon>
-              </el-button>
-              <el-button
-                size="small"
-                @click.stop="cancelRename(chat)"
-                :disabled="renamingId && renamingId !== chat.id"
-                class="rename-cancel-btn"
-              >
-                <el-icon><Close /></el-icon>
-              </el-button>
+              <div class="rename-actions">
+                <el-button
+                  style="padding: 5px 0"
+                  type="primary"
+                  size="small"
+                  @click.stop="confirmRename(chat)"
+                  :loading="renamingId === chat.id"
+                  :disabled="renamingId && renamingId !== chat.id"
+                >
+                  <el-icon style="margin: 0"><Check /></el-icon>
+                </el-button>
+                <el-button
+                  style="padding: 5px 0"
+                  size="small"
+                  @click.stop="cancelRename(chat)"
+                  :disabled="renamingId && renamingId !== chat.id"
+                >
+                  <el-icon style="margin: 0"><Close /></el-icon>
+                </el-button>
+              </div>
             </div>
 
             <span class="actions" @click.stop>
@@ -112,8 +114,6 @@
 </template>
 
 <script setup>
-// TODO：重命名的显示有bug
-
 import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
@@ -374,6 +374,9 @@ onMounted(() => {
 
         &.editing {
           background: var(--el-fill-color-light);
+          .actions {
+            display: none;
+          }
         }
 
         .icon {
@@ -387,6 +390,35 @@ onMounted(() => {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
+        }
+
+        .rename-editing {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          gap: 0.4rem;
+
+          :deep(.el-input) {
+            flex: 1;
+            min-width: 0;
+          }
+
+          .rename-input {
+            flex: 1;
+            width: auto;
+            min-width: 50px;
+          }
+
+          .rename-confirm-btn,
+          .rename-cancel-btn {
+            flex-shrink: 0;
+          }
+
+          .rename-actions {
+            display: flex;
+            gap: 0;
+            flex-shrink: 0;
+          }
         }
       }
     }
