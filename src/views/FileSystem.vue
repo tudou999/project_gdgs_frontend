@@ -26,6 +26,28 @@ const renamingId = ref(null);
 // 下拉菜单实例的 Map，用于控制关闭时机
 const dropdownRefs = ref(new Map());
 
+const infoDialogVisible = ref(false);
+const fileInfo = ref({});
+
+const uploadInfoDialogVisible = ref(false);
+const currentFileId = ref(null);
+const uploadInfoForm = ref({
+  projectName: "",
+  projectStartDate: "",
+  projectDuration: null,
+  projectManager: "",
+  projectManagerSecond: "",
+  projectLocation: "",
+  projectPartner: "",
+});
+
+// 格式化日期
+const formatDate = (dateString) => {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  return date.toLocaleString("zh-CN");
+};
+
 // 是否有文件处于编辑状态
 const isAnyEditing = computed(
   () =>
@@ -66,7 +88,7 @@ async function loadContent() {
 
     const trail = [{ id: null, name: "全部文件" }];
     for (const id of currentPathIds.value) {
-      const responseJson = await fileAPI.getInformation(id);
+      const responseJson = await fileAPI.getRawInformation(id);
       if (responseJson.code === 200) {
         const info = responseJson.data;
         trail.push({ id: id, name: info.name });
@@ -215,6 +237,62 @@ async function clickRenameButton(file) {
   const inputEl = document.querySelector(".file-item .name-input input");
   if (inputEl) {
     inputEl.focus();
+  }
+}
+
+// 点击查看文件信息按钮
+async function clickInfoButton(file) {
+  try {
+    const responseJson = await fileAPI.getInformation(file.id);
+    if (responseJson.code === 200) {
+      fileInfo.value = responseJson.data;
+      infoDialogVisible.value = true;
+    } else {
+      ElMessage.error("获取信息失败：" + responseJson.msg);
+    }
+  } catch (error) {
+    console.error("获取信息失败:", error);
+    ElMessage.warning("获取信息失败！请联系管理员");
+  }
+}
+
+// 打开上传文件信息弹窗
+function openUploadInfoDialog(file) {
+  currentFileId.value = file.id;
+  // 重置表单
+  uploadInfoForm.value = {
+    projectName: "",
+    projectStartDate: "",
+    projectDuration: null,
+    projectManager: "",
+    projectManagerSecond: "",
+    projectLocation: "",
+    projectPartner: "",
+  };
+  uploadInfoDialogVisible.value = true;
+}
+
+// 提交上传文件信息
+async function submitUploadInfo() {
+  if (!uploadInfoForm.value.projectName) {
+    ElMessage.warning("请输入项目名称");
+    return;
+  }
+
+  try {
+    const responseJson = await fileAPI.postUploadFileInfo(
+      currentFileId.value,
+      uploadInfoForm.value,
+    );
+    if (responseJson.code === 200) {
+      ElMessage.success("文件信息上传成功！");
+      uploadInfoDialogVisible.value = false;
+    } else {
+      ElMessage.error("上传失败：" + (responseJson.msg || "未知错误"));
+    }
+  } catch (error) {
+    console.error("上传文件信息失败:", error);
+    ElMessage.warning("上传失败！请联系管理员");
   }
 }
 
@@ -414,11 +492,104 @@ function gotoUpload() {
                     </template>
                   </el-popconfirm>
                 </el-dropdown-item>
+                <el-dropdown-item
+                  @click="clickInfoButton(file)"
+                  v-if="!file.folder"
+                  >查看文件信息</el-dropdown-item
+                >
+                <el-dropdown-item
+                  @click="openUploadInfoDialog(file)"
+                  v-if="!file.folder"
+                  >上传文件信息</el-dropdown-item
+                >
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>
       </div>
+
+      <!-- 上传文件信息弹窗 -->
+      <el-dialog
+        v-model="uploadInfoDialogVisible"
+        title="上传文件信息"
+        width="600px"
+      >
+        <el-form :model="uploadInfoForm" label-width="120px">
+          <el-form-item required label="项目名称">
+            <el-input v-model="uploadInfoForm.projectName" />
+          </el-form-item>
+          <el-form-item label="项目创建日期">
+            <el-date-picker
+              v-model="uploadInfoForm.projectStartDate"
+              type="date"
+              placeholder="选择日期"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+            />
+          </el-form-item>
+          <el-form-item label="项目工期(天)">
+            <el-input-number
+              v-model="uploadInfoForm.projectDuration"
+              :min="0"
+            />
+          </el-form-item>
+          <el-form-item label="项目负责人">
+            <el-input v-model="uploadInfoForm.projectManager" />
+          </el-form-item>
+          <el-form-item label="项目第二负责人">
+            <el-input v-model="uploadInfoForm.projectManagerSecond" />
+          </el-form-item>
+          <el-form-item label="项目实施位置">
+            <el-input v-model="uploadInfoForm.projectLocation" />
+          </el-form-item>
+          <el-form-item label="项目乙方单位">
+            <el-input v-model="uploadInfoForm.projectPartner" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="uploadInfoDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="submitUploadInfo">
+              确定上传
+            </el-button>
+          </span>
+        </template>
+      </el-dialog>
+
+      <!-- 文件信息弹窗 -->
+      <el-dialog v-model="infoDialogVisible" title="文件详情" width="500px">
+        <el-form :model="fileInfo" label-width="120px">
+          <el-form-item label="所属项目名称">
+            <span>{{ fileInfo.projectName || "-" }}</span>
+          </el-form-item>
+          <el-form-item label="项目创建日期">
+            <span>{{ fileInfo.projectStartDate || "-" }}</span>
+          </el-form-item>
+          <el-form-item label="项目工期">
+            <span>{{
+              fileInfo.projectDuration ? fileInfo.projectDuration + " 天" : "-"
+            }}</span>
+          </el-form-item>
+          <el-form-item label="项目负责人">
+            <span>{{ fileInfo.projectManager || "-" }}</span>
+          </el-form-item>
+          <el-form-item label="项目第二负责人">
+            <span>{{ fileInfo.projectManagerSecond || "-" }}</span>
+          </el-form-item>
+          <el-form-item label="项目实施位置">
+            <span>{{ fileInfo.projectCity || "-" }}</span>
+          </el-form-item>
+          <el-form-item label="项目乙方单位">
+            <span>{{ fileInfo.projectPartner || "-" }}</span>
+          </el-form-item>
+          <el-form-item label="创建时间">
+            <span>{{ formatDate(fileInfo.created) }}</span>
+          </el-form-item>
+          <el-form-item label="更新时间">
+            <span>{{ formatDate(fileInfo.updated) }}</span>
+          </el-form-item>
+        </el-form>
+      </el-dialog>
     </el-main>
   </el-container>
 </template>
