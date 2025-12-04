@@ -378,8 +378,20 @@ async function downloadFile(id) {
   const contentDisposition = response.headers.get("Content-Disposition");
   const fileUrl = URL.createObjectURL(response.data);
 
-  let filename = contentDisposition.match(/filename*?=(?:UTF-8'')?([^;]+)/i);
-  filename = decodeURIComponent(filename[1].replace(/^"|"$/g, ""));
+  // 提取文件名，兼容 filename= 和 filename*=，并处理 + 号为空格的问题
+  let filename = "downloaded-file";
+  if (contentDisposition) {
+    console.log("Content-Disposition:", contentDisposition);
+    // 匹配 filename= 或 filename*= 的值，自动去除引号
+    const match = contentDisposition.match(
+      /filename\*?=['"]?(?:UTF-8'')?([^;"']+)['"]?/i,
+    );
+    if (match && match[1]) {
+      // 先将 URL 编码中的 + 替换为 %20，再进行解码
+      filename = decodeURIComponent(match[1].replace(/\+/g, "%20"));
+    }
+  }
+  console.log("Parsed filename:", filename);
 
   const link = document.createElement("a");
   link.href = fileUrl;
