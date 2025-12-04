@@ -32,14 +32,13 @@
 </template>
 
 <script setup>
-// TODO：点击返回文件夹时没反应
 import { ElMessage } from "element-plus";
 import { UploadFilled } from "@element-plus/icons-vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { fileAPI } from "../services/file";
-import router from "../router/index.js";
 
 const route = useRoute();
+const router = useRouter();
 
 async function uploadFile(options) {
   const { file, onSuccess, onError, onProgress } = options;
@@ -85,11 +84,10 @@ async function uploadFile(options) {
 // 返回文件夹
 async function goBackToFileSystem() {
   const id = route.query.folderId;
+  const query = id ? { id } : {};
   await router.push({
     name: "FileSystem",
-    query: {
-      id: id,
-    },
+    query,
   });
 }
 </script>
