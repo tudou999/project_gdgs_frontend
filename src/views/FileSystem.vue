@@ -25,6 +25,8 @@ const existingNew = ref(false);
 const renamingId = ref(null);
 // 下拉菜单实例的 Map，用于控制关闭时机
 const dropdownRefs = ref(new Map());
+// 面包屑名称缓存：ID -> Name
+const folderCache = new Map();
 
 const infoDialogVisible = ref(false);
 const fileInfo = ref({});
@@ -87,16 +89,38 @@ async function loadContent() {
     await reloadContent();
 
     const trail = [{ id: null, name: "全部文件" }];
-    for (const id of currentPathIds.value) {
-      const responseJson = await fileAPI.getRawInformation(id);
-      if (responseJson.code === 200) {
-        const info = responseJson.data;
-        trail.push({ id: id, name: info.name });
-      } else {
-        ElMessage.error("加载失败：", responseJson.msg);
-        await router.replace({ path: "/file" });
+
+    // 1. 过滤出缓存中不存在的 ID
+    const missingIds = currentPathIds.value.filter(
+      (id) => !folderCache.has(id),
+    );
+
+    // 2. 仅请求缺失的 ID
+    if (missingIds.length > 0) {
+      const promises = missingIds.map((id) => fileAPI.getRawInformation(id));
+      const responses = await Promise.all(promises);
+
+      for (let i = 0; i < responses.length; i++) {
+        const responseJson = responses[i];
+        const id = missingIds[i];
+        if (responseJson.code === 200) {
+          // 写入缓存
+          folderCache.set(id, responseJson.data.name);
+        } else {
+          ElMessage.error("加载失败：", responseJson.msg);
+          await router.replace({ path: "/file" });
+          return;
+        }
       }
     }
+
+    // 3. 从缓存构建面包屑
+    for (const id of currentPathIds.value) {
+      if (folderCache.has(id)) {
+        trail.push({ id: id, name: folderCache.get(id) });
+      }
+    }
+
     breadcrumbTrail.value = trail;
   } catch (error) {
     console.error("加载失败:", error);
@@ -209,10 +233,16 @@ async function reloadContent() {
   try {
     const responseJson = await fileAPI.getFolderList(currentFolderId.value);
     if (responseJson.code === 200) {
-      fileList.value = responseJson.data.map((item) => ({
-        ...item,
-        editing: 0,
-      }));
+      fileList.value = responseJson.data
+        .map((item) => ({
+          ...item,
+          editing: 0,
+        }))
+        .sort((a, b) => {
+          if (a.folder && !b.folder) return -1;
+          if (!a.folder && b.folder) return 1;
+          return a.name.localeCompare(b.name, "zh-CN");
+        });
       existingNew.value = false;
     } else {
       ElMessage.error("加载失败：", responseJson.msg);
@@ -310,9 +340,11 @@ async function checkOrRename(editing, fatherId, checkedId, name) {
   } else if (editing === 2) {
     if (renamingId.value) return;
     renamingId.value = checkedId;
-    const responseJson = await fileAPI.patchRenameFile(checkedId, name);
+    const responseJson = await fileAPI.putRenameFile(checkedId, name);
     try {
       if (responseJson.code === 200) {
+        // 更新缓存中的名称
+        folderCache.set(checkedId, name);
         await reloadContent();
         ElMessage.success("重命名成功！");
       } else {

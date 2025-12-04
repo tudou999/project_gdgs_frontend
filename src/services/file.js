@@ -29,8 +29,8 @@ export const fileAPI = {
   },
 
   // 重命名文件/文件夹
-  patchRenameFile(id, name) {
-    return apiClient.patch(`/files/${id}/rename`, {
+  putRenameFile(id, name) {
+    return apiClient.put(`/files/${id}/rename`, {
       newName: name,
     });
   },
