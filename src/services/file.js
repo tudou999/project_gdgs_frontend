@@ -42,17 +42,18 @@ export const fileAPI = {
 
   // 下载文件
   getDownloadFile(id) {
-    return rawApiClient.get(`/files/${id}/download`, {
+    return rawApiClient.get(`/files/${id}/content`, {
       responseType: "blob",
     });
   },
 
   // 上传文件
-  postUploadFile(id, file) {
+  postUploadFile(id, file, onProgress) {
     return rawApiClient.post("/files/upload", file, {
       params: {
         "parent-id": id,
       },
+      onUploadProgress: onProgress,
     });
   },
 
