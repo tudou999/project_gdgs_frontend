@@ -44,7 +44,7 @@
               v-model="registerForm.password"
               :type="showPassword ? 'text' : 'password'"
               class="form-input"
-              placeholder="请输入密码（至少6位）"
+              placeholder="请输入密码（至少8位）"
               required
             />
             <div class="input-icon">
