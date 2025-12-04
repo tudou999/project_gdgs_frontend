@@ -32,6 +32,7 @@
 </template>
 
 <script setup>
+// TODO：点击返回文件夹时没反应
 import { ElMessage } from "element-plus";
 import { UploadFilled } from "@element-plus/icons-vue";
 import { useRoute } from "vue-router";
@@ -41,7 +42,7 @@ import router from "../router/index.js";
 const route = useRoute();
 
 async function uploadFile(options) {
-  const { file, onSuccess, onError } = options;
+  const { file, onSuccess, onError, onProgress } = options;
 
   const folderIdStr = route.query.folderId;
   const lastFolderId = folderIdStr ? folderIdStr.split(",").pop() : null;
@@ -50,7 +51,18 @@ async function uploadFile(options) {
   formData.append("file", file);
 
   try {
-    const responseJson = await fileAPI.postUploadFile(lastFolderId, formData);
+    const responseJson = await fileAPI.postUploadFile(
+      lastFolderId,
+      formData,
+      (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total,
+          );
+          onProgress({ percent });
+        }
+      },
+    );
     if (responseJson.data.code === 200) {
       ElMessage.success("上传成功！");
       if (onSuccess) {
@@ -83,8 +95,8 @@ async function goBackToFileSystem() {
 </script>
 
 <style scoped lang="scss">
- .el-header {
-   display: flex;
-   align-items: center;
- }
+.el-header {
+  display: flex;
+  align-items: center;
+}
 </style>
