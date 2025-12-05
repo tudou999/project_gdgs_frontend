@@ -40,10 +40,11 @@ export const fileAPI = {
     return apiClient.delete(`/files/${id}`);
   },
 
-  // 下载文件
-  getDownloadFile(id) {
+  // 下载文件（支持进度回调）
+  getDownloadFile(id, onProgress) {
     return rawApiClient.get(`/files/${id}/content`, {
       responseType: "blob",
+      onDownloadProgress: onProgress,
     });
   },
 
