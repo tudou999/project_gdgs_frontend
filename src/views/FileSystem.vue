@@ -33,6 +33,9 @@ const fileInfo = ref({});
 
 const uploadInfoDialogVisible = ref(false);
 const currentFileId = ref(null);
+const isDownloading = ref(false);
+const downloadPercent = ref(0);
+const downloadingFileName = ref("");
 const uploadInfoForm = ref({
   projectName: "",
   projectStartDate: "",
@@ -373,8 +376,17 @@ async function deleteFile(id) {
 }
 
 // 下载文件
-async function downloadFile(id) {
-  const response = await fileAPI.getDownloadFile(id);
+async function downloadFile(id, name) {
+  isDownloading.value = true;
+  downloadPercent.value = 0;
+  downloadingFileName.value = name || "";
+  ElMessage.success("开始下载！");
+  const response = await fileAPI.getDownloadFile(id, (event) => {
+    if (!event.total) return;
+    downloadPercent.value = Number(
+      ((event.loaded / event.total) * 100).toFixed(2),
+    );
+  });
   const contentDisposition = response.headers.get("Content-Disposition");
   const fileUrl = URL.createObjectURL(response.data);
 
@@ -391,15 +403,14 @@ async function downloadFile(id) {
       filename = decodeURIComponent(match[1].replace(/\+/g, "%20"));
     }
   }
-  console.log("Parsed filename:", filename);
 
   const link = document.createElement("a");
   link.href = fileUrl;
   link.download = filename;
   link.click();
 
-  ElMessage.success("开始下载！");
   URL.revokeObjectURL(fileUrl);
+  isDownloading.value = false;
 }
 
 // 计算文件大小
@@ -421,6 +432,18 @@ function gotoUpload() {
 <template>
   <el-container>
     <el-main style="margin: 0 400px">
+      <!-- 下载进度条 -->
+      <div v-if="isDownloading" class="download-progress-fixed">
+        <div style="margin-bottom: 10px">
+          正在下载文件：{{ downloadingFileName || "未知文件" }}
+        </div>
+        <el-progress
+          :percentage="downloadPercent"
+          :stroke-width="12"
+          style="margin-bottom: 5px"
+        />
+      </div>
+
       <div class="header-section">
         <!-- 面包屑 -->
         <el-breadcrumb style="margin: 0" :separator-icon="ArrowRight">
@@ -513,7 +536,7 @@ function gotoUpload() {
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item
-                  @click="downloadFile(file.id)"
+                  @click="downloadFile(file.id, file.name)"
                   v-if="!file.folder"
                   >下载</el-dropdown-item
                 >
@@ -820,5 +843,25 @@ function gotoUpload() {
 
 ::v-deep(.el-dropdown-menu__item.my-class) {
   padding: 0;
+}
+
+.download-progress-fixed {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  width: 400px;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.65);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 2000;
+
+  :deep(.el-progress-bar__outer) {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+
+  :deep(.el-progress__text) {
+    color: #fff;
+  }
 }
 </style>
