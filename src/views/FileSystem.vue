@@ -1,5 +1,4 @@
 <script setup>
-// TODO：返回的时候好像会自动在空白处加加号，排查问题
 import { ElMessage } from "element-plus";
 import {
   ArrowRight,
@@ -32,11 +31,26 @@ const dropdownRefs = ref(new Map());
 // 面包屑名称缓存：ID -> Name
 const folderCache = new Map();
 
+// 文件信息弹窗相关
+// 是否显示文件信息对话框
 const infoDialogVisible = ref(false);
+// 当前查看的文件信息
 const fileInfo = ref({});
 
+// 上传文件信息弹窗相关
+// 是否显示上传文件信息对话框
 const uploadInfoDialogVisible = ref(false);
+// 当前上传文件的 ID
 const currentFileId = ref(null);
+
+// 移动文件弹窗相关
+// 是否显示移动文件对话框
+const moveDialogVisible = ref(false);
+// 要移动的文件对象
+const moveSourceFile = ref(null);
+// 目标文件夹 ID
+const moveTargetFolderId = ref(null);
+
 const isDownloading = ref(false);
 const downloadPercent = ref(0);
 const downloadingFileName = ref("");
@@ -293,6 +307,7 @@ async function clickInfoButton(file) {
   }
 }
 
+/* 上传文件信息操作 */
 // 打开上传文件信息弹窗
 function openUploadInfoDialog(file) {
   currentFileId.value = file.id;
@@ -379,6 +394,76 @@ async function deleteFile(id) {
   }
 }
 
+/* 移动文件操作 */
+// 打开移动文件对话框
+function openMoveDialog(file) {
+  if (!file || file.folder) return;
+  moveSourceFile.value = file;
+  moveTargetFolderId.value = null;
+  moveDialogVisible.value = true;
+}
+
+// 选择移动目标文件夹
+function onMoveFolderNodeClick(data) {
+  if (data && data.id != null) {
+    moveTargetFolderId.value = data.id;
+  }
+}
+
+// 加载文件夹树
+async function loadFolderTree(node, resolve) {
+  try {
+    const parentId = node.level === 0 ? null : node.data.id;
+    const responseJson = await fileAPI.getFolderList(parentId);
+    if (responseJson.code === 200) {
+      const folders = Array.isArray(responseJson.data)
+        ? responseJson.data.filter((item) => item.folder === true)
+        : [];
+      const children = folders.map((item) => ({
+        id: item.id,
+        label: item.name,
+        leaf: false,
+      }));
+      resolve(children);
+    } else {
+      ElMessage.error("加载文件夹失败：" + (responseJson.msg || "未知错误"));
+      resolve([]);
+    }
+  } catch (error) {
+    console.error("加载文件夹失败:", error);
+    ElMessage.warning("加载文件夹失败！请联系管理员");
+    resolve([]);
+  }
+}
+
+// 确认移动文件
+async function confirmMove() {
+  if (!moveSourceFile.value || moveTargetFolderId.value == null) {
+    ElMessage.warning("请选择要移动到的文件夹");
+    return;
+  }
+
+  try {
+    const responseJson = await fileAPI.putMoveFile(
+      moveSourceFile.value.id,
+      moveTargetFolderId.value,
+    );
+    if (responseJson.code === 200) {
+      ElMessage.success("移动成功！");
+      moveDialogVisible.value = false;
+      moveSourceFile.value = null;
+      moveTargetFolderId.value = null;
+      await reloadContent();
+    } else {
+      ElMessage.error("移动失败：" + (responseJson.msg || "未知错误"));
+    }
+  } catch (error) {
+    console.error("移动文件失败:", error);
+    ElMessage.warning("移动失败！请联系管理员");
+  }
+}
+
+/* 拖拽文件操作 */
 // 拖拽开始：记录被拖动的文件 ID
 function onFileDragStart(file) {
   if (file && !file.folder) {
@@ -634,6 +719,11 @@ function gotoUpload() {
                   >查看文件信息</el-dropdown-item
                 >
                 <el-dropdown-item
+                  @click="openMoveDialog(file)"
+                  v-if="!file.folder"
+                  >移动</el-dropdown-item
+                >
+                <el-dropdown-item
                   @click="openUploadInfoDialog(file)"
                   v-if="!file.folder"
                   >上传文件信息</el-dropdown-item
@@ -725,6 +815,24 @@ function gotoUpload() {
             <span>{{ formatDate(fileInfo.updated) }}</span>
           </el-form-item>
         </el-form>
+      </el-dialog>
+
+      <!-- 移动文件弹窗 -->
+      <el-dialog v-model="moveDialogVisible" title="移动文件" width="400px">
+        <div style="margin-bottom: 12px">选择要移动到的文件夹：</div>
+        <el-tree
+          node-key="id"
+          lazy
+          :load="loadFolderTree"
+          :expand-on-click-node="false"
+          @node-click="onMoveFolderNodeClick"
+        />
+        <template #footer>
+          <span class="dialog-footer">
+            <el-button @click="moveDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="confirmMove">确定</el-button>
+          </span>
+        </template>
       </el-dialog>
     </el-main>
   </el-container>
