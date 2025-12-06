@@ -91,7 +91,21 @@ const loadUsers = async () => {
     );
 
     if (getCode(response)) {
-      users.value = response.data.records || [];
+      users.value = (response.data.records || []).slice().sort((a, b) => {
+        const aIsAdmin = a.role === "ADMIN";
+        const bIsAdmin = b.role === "ADMIN";
+
+        if (aIsAdmin !== bIsAdmin) {
+          return aIsAdmin ? -1 : 1;
+        }
+
+        const emailA = (a.email || "").toLowerCase();
+        const emailB = (b.email || "").toLowerCase();
+
+        if (emailA < emailB) return -1;
+        if (emailA > emailB) return 1;
+        return 0;
+      });
 
       pagination.value = {
         current: Number(response.data.current),
