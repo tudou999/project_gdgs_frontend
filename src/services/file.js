@@ -1,9 +1,11 @@
 import { apiClient, rawApiClient } from "./client";
 
+const FILE_API_BASE_URL = "/files";
+
 export const fileAPI = {
   // 获取文件列表
   getFolderList(folderId) {
-    return apiClient.get("/files", {
+    return apiClient.get(`${FILE_API_BASE_URL}`, {
       params: {
         id: folderId,
       },
@@ -12,17 +14,17 @@ export const fileAPI = {
 
   // 获取文件原始信息
   getRawInformation(id) {
-    return apiClient.get(`/files/${id}`);
+    return apiClient.get(`${FILE_API_BASE_URL}/${id}`);
   },
 
   // 获取文件信息
   getInformation(id) {
-    return apiClient.get(`/files/${id}/info`);
+    return apiClient.get(`${FILE_API_BASE_URL}/${id}/info`);
   },
 
   // 创建新文件夹
   postCreateFolder(id, name) {
-    return apiClient.post("/files/folder", {
+    return apiClient.post(`${FILE_API_BASE_URL}/folder`, {
       parentId: id,
       name: name,
     });
@@ -30,19 +32,19 @@ export const fileAPI = {
 
   // 重命名文件/文件夹
   putRenameFile(id, name) {
-    return apiClient.put(`/files/${id}/rename`, {
+    return apiClient.put(`${FILE_API_BASE_URL}/${id}/rename`, {
       newName: name,
     });
   },
 
   // 删除文件/文件夹
   deleteDeleteFile(id) {
-    return apiClient.delete(`/files/${id}`);
+    return apiClient.delete(`${FILE_API_BASE_URL}/${id}`);
   },
 
   // 下载文件（支持进度回调）
   getDownloadFile(id, onProgress) {
-    return rawApiClient.get(`/files/${id}/content`, {
+    return rawApiClient.get(`${FILE_API_BASE_URL}/${id}/content`, {
       responseType: "blob",
       onDownloadProgress: onProgress,
     });
@@ -50,7 +52,7 @@ export const fileAPI = {
 
   // 上传文件
   postUploadFile(id, file, onProgress) {
-    return rawApiClient.post("/files/upload", file, {
+    return rawApiClient.post(`${FILE_API_BASE_URL}/upload`, file, {
       params: {
         "parent-id": id,
       },
@@ -60,7 +62,7 @@ export const fileAPI = {
 
   // 上传文件信息
   postUploadFileInfo(fileMetadataId, info) {
-    return apiClient.post("/files/info", {
+    return apiClient.post(`${FILE_API_BASE_URL}/info`, {
       file_metadata_id: fileMetadataId,
       projectName: info.projectName,
       projectStartDate: info.projectStartDate,
@@ -74,7 +76,7 @@ export const fileAPI = {
 
   // 移动文件至文件夹
   putMoveFile(id, targetFolderId) {
-    return apiClient.put(`/files/${id}/move`, {
+    return apiClient.put(`${FILE_API_BASE_URL}/${id}/move`, {
       id: id,
       newParentId: targetFolderId,
     });

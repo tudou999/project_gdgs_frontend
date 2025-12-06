@@ -2,6 +2,8 @@ import { useUserStore } from "../stores/user";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { apiClient } from "./client";
 
+const SESSIONS_API_BASE_URL = "/sessions";
+
 const userStore = useUserStore();
 
 export const chatAPI = {
@@ -68,26 +70,26 @@ export const chatAPI = {
   // 获取聊天历史列表
   getChatHistory() {
     // 添加类型参数
-    return apiClient.get("/sessions");
+    return apiClient.get(`${SESSIONS_API_BASE_URL}`);
   },
 
   // 创建新的聊天会话
   postCreateSession(title = "新对话") {
-    return apiClient.post("/sessions", {
+    return apiClient.post(`${SESSIONS_API_BASE_URL}`, {
       title: title,
     });
   },
 
   // 重命名聊天会话
   patchRenameSession(chatId, name) {
-    return apiClient.patch(`/sessions/${chatId}`, {
+    return apiClient.patch(`${SESSIONS_API_BASE_URL}/${chatId}`, {
       title: name,
     });
   },
 
   // 删除聊天会话
   deleteDeleteSession(chatId) {
-    return apiClient.delete(`/sessions/${chatId}`);
+    return apiClient.delete(`${SESSIONS_API_BASE_URL}/${chatId}`);
   },
 
   // 分页获取对话聊天记录
