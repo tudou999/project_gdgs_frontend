@@ -1,7 +1,7 @@
 <template>
   <div class="home" :class="{ dark: isDark }">
     <div class="container">
-      <h1 class="title">卫星应用中心智能助手</h1>
+      <h1 class="title">{{ greeting }}好，{{ username }}！</h1>
       <div class="cards-grid">
         <router-link
           v-for="app in aiApps"
@@ -21,18 +21,33 @@
 </template>
 
 <script setup>
+// 挂载时加载用户信息
+onMounted(loadUserInfo);
+
 defineOptions({
   name: "Home",
 });
 
-import { ref } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useDark } from "@vueuse/core";
 import {
   ChatBubbleLeftRightIcon,
   DocumentTextIcon,
 } from "@heroicons/vue/24/outline";
+import { UseAPI } from "../services/user";
 
 const isDark = useDark();
+
+// 用户名
+const username = ref("未知用户");
+
+// 根据当前时间生成问候语
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "早上";
+  if (hour >= 12 && hour < 18) return "下午";
+  return "晚上";
+});
 
 const aiApps = ref([
   {
@@ -50,6 +65,18 @@ const aiApps = ref([
     icon: DocumentTextIcon,
   },
 ]);
+
+// 获取当前用户信息
+async function loadUserInfo() {
+  try {
+    const res = await UseAPI.getUserInfo();
+    if (res.code === 200) {
+      username.value = res.data.name || "未知用户";
+    }
+  } catch (error) {
+    console.error("获取用户信息失败:", error);
+  }
+}
 </script>
 
 <style scoped lang="scss">
