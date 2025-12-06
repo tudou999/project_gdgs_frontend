@@ -11,7 +11,7 @@ import {
 } from "vue";
 import { Position } from "@element-plus/icons-vue";
 import ChatMessage from "../components/ChatMessage.vue";
-import { chatAPI } from "../services/chat";
+import { chatAPI } from "../services/sessions.js";
 import IconStop from "../components/icons/IconStop.vue";
 import { ElMessage } from "element-plus";
 

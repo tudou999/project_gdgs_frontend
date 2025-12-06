@@ -1,13 +1,13 @@
 <template>
   <el-container class="login-container">
     <el-container class="login-card">
-      <!--      标题-->
+      <!-- 标题 -->
       <el-header class="login-header">
         <h1 class="login-title">欢迎回来</h1>
         <p class="login-subtitle">请使用您的邮箱和密码登录</p>
       </el-header>
 
-      <!--      表单体-->
+      <!-- 表单体 -->
       <el-form
         :model="loginForm"
         class="login-form"
@@ -42,7 +42,7 @@
         </el-form-item>
       </el-form>
 
-      <!--      登录按钮-->
+      <!-- 登录按钮 -->
       <el-button
         @click="handleLogin"
         class="login-button"
@@ -54,7 +54,7 @@
         <span v-else>登录</span>
       </el-button>
 
-      <!--      注册按钮-->
+      <!-- 注册按钮 -->
       <div class="login-footer">
         <p class="register-text">
           还没有账号？

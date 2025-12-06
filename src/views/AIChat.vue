@@ -118,7 +118,7 @@ import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
 import ChatRecord from "./ChatRecord.vue";
-import { chatAPI } from "../services/chat.js";
+import { chatAPI } from "../services/sessions.js";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 defineOptions({
