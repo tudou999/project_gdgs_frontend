@@ -23,6 +23,10 @@ const breadcrumbTrail = ref([{ id: null, name: "全部文件" }]);
 const existingNew = ref(false);
 // 处于重命名状态的文件 ID
 const renamingId = ref(null);
+// 当前正在被拖拽的文件 ID
+const draggingFileId = ref(null);
+// 当前拖拽悬停的文件夹 ID
+const hoverFolderId = ref(null);
 // 下拉菜单实例的 Map，用于控制关闭时机
 const dropdownRefs = ref(new Map());
 // 面包屑名称缓存：ID -> Name
@@ -375,6 +379,57 @@ async function deleteFile(id) {
   }
 }
 
+// 拖拽开始：记录被拖动的文件 ID
+function onFileDragStart(file) {
+  if (file && !file.folder) {
+    draggingFileId.value = file.id;
+  } else {
+    draggingFileId.value = null;
+  }
+}
+
+// 拖拽经过文件夹（主要用于配合 .prevent）
+function onFolderDragOver() {}
+
+// 拖拽进入文件夹：设置高亮
+function onFolderDragEnter(targetFolder) {
+  if (targetFolder && targetFolder.folder) {
+    hoverFolderId.value = targetFolder.id;
+  }
+}
+
+// 拖拽离开文件夹：取消高亮
+function onFolderDragLeave(targetFolder) {
+  if (hoverFolderId.value === targetFolder.id) {
+    hoverFolderId.value = null;
+  }
+}
+
+// 在文件夹上放下文件：调用移动接口
+async function onFolderDrop(targetFolder) {
+  if (!draggingFileId.value) return;
+  if (!targetFolder || !targetFolder.folder) return;
+
+  const fileId = draggingFileId.value;
+  draggingFileId.value = null;
+  if (hoverFolderId.value === targetFolder.id) {
+    hoverFolderId.value = null;
+  }
+
+  try {
+    const responseJson = await fileAPI.putMoveFile(fileId, targetFolder.id);
+    if (responseJson.code === 200) {
+      await reloadContent();
+      ElMessage.success("移动成功！");
+    } else {
+      ElMessage.error("移动失败：" + (responseJson.msg || "未知错误"));
+    }
+  } catch (error) {
+    console.error("移动文件失败:", error);
+    ElMessage.warning("移动失败！请联系管理员");
+  }
+}
+
 // 下载文件
 async function downloadFile(id, name) {
   isDownloading.value = true;
@@ -481,7 +536,12 @@ function gotoUpload() {
         </el-button>
       </div>
 
-      <div v-for="file in fileList" :key="file.id" class="file-item">
+      <div
+        v-for="file in fileList"
+        :key="file.id"
+        class="file-item"
+        :class="{ 'folder-drop-hover': hoverFolderId === file.id }"
+      >
         <!-- 编辑状态 -->
         <div v-if="file.editing !== 0" class="file-item-editing">
           <el-input class="name-input" v-model="file.name" clearable />
@@ -512,12 +572,21 @@ function gotoUpload() {
             @click="pushId(file.id)"
             @keydown.enter="pushId(file.id)"
             @keydown.space.prevent="pushId(file.id)"
+            @dragover.prevent="onFolderDragOver($event)"
+            @dragenter.prevent="onFolderDragEnter(file)"
+            @dragleave.prevent="onFolderDragLeave(file)"
+            @drop="onFolderDrop(file)"
           >
             {{ file.name }}
           </div>
 
           <!-- 文件 -->
-          <div v-else class="file-name">
+          <div
+            v-else
+            class="file-name"
+            draggable="true"
+            @dragstart="onFileDragStart(file)"
+          >
             <span class="file-name-text">{{ file.name }}</span>
             <span class="file-size-text">{{
               calculateFileSize(file.size)
@@ -830,6 +899,15 @@ function gotoUpload() {
 
 .file-item-normal .folder-link:hover {
   text-decoration: underline;
+}
+
+.folder-drop-hover {
+  background-color: color-mix(
+    in srgb,
+    var(--el-color-primary) 10%,
+    transparent
+  );
+  border-radius: 4px;
 }
 
 .dropdown-item-delete-fullSpan {

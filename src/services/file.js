@@ -71,4 +71,12 @@ export const fileAPI = {
       projectPartner: info.projectPartner,
     });
   },
+
+  // 移动文件至文件夹
+  putMoveFile(id, targetFolderId) {
+    return apiClient.put(`/files/${id}/move`, {
+      id: id,
+      newParentId: targetFolderId,
+    });
+  },
 };
