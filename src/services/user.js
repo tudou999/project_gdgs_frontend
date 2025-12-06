@@ -35,3 +35,10 @@ export const RootAPI = {
     return apiClient.delete(`/user/admin/${userId}`);
   },
 };
+
+export const UseAPI = {
+  // 获取当前用户信息
+  getUserInfo() {
+    return apiClient.get("/user");
+  },
+};
