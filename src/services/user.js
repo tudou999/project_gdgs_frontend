@@ -17,6 +17,7 @@ export const SignAPI = {
       email: registerFormValue.email,
       password: registerFormValue.password,
       confirmPassword: registerFormValue.confirmPassword,
+      name: registerFormValue.name,
     });
   },
 };
