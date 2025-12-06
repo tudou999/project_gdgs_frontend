@@ -1,7 +1,7 @@
 <template>
   <div class="home" :class="{ dark: isDark }">
     <div class="container">
-      <h1 class="title">{{ greeting }}好，{{ username }}！</h1>
+      <h1 class="title" v-if="showGreeting">{{ greeting }}好，{{ username }}！</h1>
       <div class="cards-grid">
         <router-link
           v-for="app in aiApps"
@@ -40,6 +40,8 @@ const isDark = useDark();
 
 // 用户名
 const username = ref("未知用户");
+// 是否显示欢迎语
+const showGreeting = ref(false);
 
 // 根据当前时间生成问候语
 const greeting = computed(() => {
@@ -72,9 +74,13 @@ async function loadUserInfo() {
     const res = await UseAPI.getUserInfo();
     if (res.code === 200) {
       username.value = res.data.name || "未知用户";
+      showGreeting.value = true;
+    } else {
+      showGreeting.value = false;
     }
   } catch (error) {
     console.error("获取用户信息失败:", error);
+    showGreeting.value = false;
   }
 }
 </script>
