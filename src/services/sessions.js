@@ -3,61 +3,63 @@ import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { apiClient } from "./client";
 
 const SESSIONS_API_BASE_URL = "/sessions";
+const ASSISTANT_API_BASE_URL = "/assistant";
+
+const BASE = window.location.origin;
 
 const userStore = useUserStore();
 
 export const chatAPI = {
-  // 发送消息并处理流式响应（返回用于取消的句柄）
-  sendMessage({ message, sessionId, mode, onChunk, onFinish, onError }) {
-    const Mode = {
-      local: "local",
-      online: "online",
-    };
+  // 发送信息
+  postMessage({ message, sessionId, mode }) {
+    return apiClient.post(`${ASSISTANT_API_BASE_URL}/${mode}/chat`, {
+      message: message,
+      sessionId: sessionId,
+    });
+  },
 
-    let paramMode = mode ? Mode.online : Mode.local;
+  // 根据 taskId 订阅 SSE 流
+  subscribeChatStream({
+    taskId,
+    sessionId,
+    onChunk,
+    onFinish,
+    onError,
+    onChunkId,
+    resumeFromChunkId,
+  }) {
+    const sseUrl = new URL(`/api/v1/assistant/sse/${taskId}`, BASE);
 
-    const base = window.location.origin;
-    const url = new URL(`/api/v1/assistant/${paramMode}/chat`, base);
-
-    url.searchParams.append("sessionId", sessionId);
-
+    // 添加 sessionId 参数；lastChunkId 通过请求头传递给后端
+    const params = { sessionId: sessionId };
+    sseUrl.search = new URLSearchParams(params).toString();
     const controller = new AbortController();
 
-    const finished = fetchEventSource(url, {
-      method: "POST",
+    const finished = fetchEventSource(sseUrl, {
+      method: "GET",
       headers: {
         Authorization: userStore.token,
-        "Content-Type": "application/json",
+        "Last-Chunk-ID": resumeFromChunkId,
       },
-      body: JSON.stringify({
-        message: message,
-        sessionId: sessionId,
-      }),
       openWhenHidden: true,
       signal: controller.signal,
 
+      // 处理接收到的消息
       onmessage(event) {
         if (!event.data) return;
-        let chunk = event.data;
-
-        try {
-          chunk = JSON.parse(event.data);
-        } catch (_) {}
-
-        if (typeof chunk !== "string") chunk = String(chunk);
-        chunk = chunk.replace(/\r\n/g, "\n");
-        chunk = chunk.replace(/^data:\s?/gm, "");
-
-        onChunk && onChunk(chunk);
+        // 返回 chunk 及其 id
+        onChunkId(event.id);
+        onChunk && onChunk(event.data);
       },
 
+      // 连接关闭时的回调
       onclose() {
         onFinish && onFinish();
       },
 
+      // 错误处理
       onerror(err) {
         onError && onError(err);
-        // 这里可以选择要不要 throw；如不想 fetchEventSource 自动重试，就不要再 throw
       },
     });
 
@@ -65,6 +67,14 @@ export const chatAPI = {
       cancel: () => controller.abort(),
       finished,
     };
+  },
+
+  // 手动停止对话
+  postStopMessage(sessionId, taskId) {
+    return apiClient.post(`${ASSISTANT_API_BASE_URL}/stop`, {
+      sessionId: sessionId,
+      taskId: taskId,
+    });
   },
 
   // 获取聊天历史列表

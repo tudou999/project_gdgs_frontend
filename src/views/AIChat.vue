@@ -5,11 +5,7 @@
       <el-aside class="sidebar">
         <div class="aside-header">
           <h2>聊天记录</h2>
-          <el-button
-            size="large"
-            @click="startNewChat(currentChatId)"
-            type="primary"
-          >
+          <el-button size="large" @click="startNewChat" type="primary">
             <el-icon>
               <ChatDotSquare />
             </el-icon>
@@ -114,6 +110,7 @@
 </template>
 
 <script setup>
+// TODO：频繁切换会话会导致请求堆积，考虑增加节流或取消前一个请求的逻辑
 import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
@@ -140,12 +137,24 @@ const isAnyEditing = computed(
     chatHistory.value.some((c) => c.editing !== 0),
 );
 
+// 更新当前会话 ID，并同步到 localStorage
+function updateCurrentChatId(id) {
+  currentChatId.value = id;
+  // 只有有效的 chatId 才存储到 localStorage
+  if (id === null || id === undefined || id === 0) {
+    localStorage.removeItem("lastActiveChatId");
+  } else {
+    localStorage.setItem("lastActiveChatId", String(id));
+  }
+}
+
 // 开始新的对话（将 currentChatId 置为临时ID0，并聚焦输入框）
 function startNewChat() {
   if (currentChatId.value === 0) {
     ElMessage.success("当前已是最新对话！");
+  } else {
+    updateCurrentChatId(0);
   }
-  currentChatId.value = 0;
   focusInput();
 }
 
@@ -165,14 +174,17 @@ function handleHistorySelect(index) {
   const chatId = index;
   if (!chatId) return;
 
+  // 查找对应的会话记录
   const chat = Array.isArray(chatHistory.value)
     ? chatHistory.value.find((item) => item.id === chatId)
     : null;
 
+  // 如果点击的就是当前会话或正在编辑中，忽略切换
   if (!chat || chat.editing !== 0) return;
   if (currentChatId.value === chatId) return;
 
-  currentChatId.value = chatId;
+  // 调用更新会话 ID 函数
+  updateCurrentChatId(chatId);
 }
 
 // 当右侧 ChatRecord 创建了一个新的会话时，更新会话列表并选中该会话
@@ -183,7 +195,7 @@ function handleChatCreated(chat) {
     normalized,
     ...chatHistory.value.filter((item) => item.id !== normalized.id),
   ];
-  currentChatId.value = normalized.id;
+  updateCurrentChatId(normalized.id);
 }
 
 // 进入重命名模式：重置其他会话的编辑状态，并记录原始标题
@@ -247,26 +259,17 @@ async function deleteSession(id, name) {
     .then(async () => {
       const response = await chatAPI.deleteDeleteSession(id);
       if (response.code === 200) {
-        ElMessage({
-          type: "success",
-          message: `删除 ${name} 成功！`,
-        });
+        ElMessage.success(`删除 ${name} 成功！`);
         if (currentChatId.value === id) {
-          currentChatId.value = null;
+          updateCurrentChatId(null);
         }
         await loadChatHistory();
       } else {
-        ElMessage({
-          type: "error",
-          message: `删除 ${name} 失败！请联系管理员。`,
-        });
+        ElMessage.error(`删除 ${name} 失败！请联系管理员。`);
       }
     })
     .catch(() => {
-      ElMessage({
-        type: "info",
-        message: "已取消删除",
-      });
+      ElMessage.info("已取消删除");
     });
 }
 
@@ -280,17 +283,35 @@ async function loadChatHistory() {
     chatHistory.value = history;
 
     if (!history.length) {
-      startNewChat();
+      updateCurrentChatId(0);
+      return;
+    }
+
+    const storedChatId = localStorage.getItem("lastActiveChatId");
+    // 过滤无效值：null, "null", "0", "undefined" 等
+    const isValidStoredId =
+      storedChatId &&
+      storedChatId !== "null" &&
+      storedChatId !== "0" &&
+      storedChatId !== "undefined";
+    if (
+      isValidStoredId &&
+      history.some((item) => String(item.id) === storedChatId)
+    ) {
+      updateCurrentChatId(
+        history.find((item) => String(item.id) === storedChatId)?.id ??
+          history[0].id,
+      );
       return;
     }
 
     if (!history.some((item) => item.id === currentChatId.value)) {
-      currentChatId.value = history[0].id;
+      updateCurrentChatId(history[0].id);
     }
   } catch (error) {
     console.error("加载聊天历史失败:", error);
     chatHistory.value = [];
-    startNewChat();
+    updateCurrentChatId(0);
   }
 }
 
