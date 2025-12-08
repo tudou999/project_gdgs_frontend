@@ -53,6 +53,10 @@ let lastReceivedChunkId = null; // 最后收到的 SSE chunk ID，用于断点�
 const SSE_RESUME_INFO_KEY = "sseResumeInfo";
 let activeStreamHandle = null; // 当前 fetchEventSource 句柄，用于取消流式输出
 const activeAssistantMessage = ref(null); // 正在流式输出的 AI 消息对象
+
+// 流式对话缓存：切换对话时保存正在进行的流式状态，以便切换回来时恢复
+// key: sessionId, value: { activeMessage, typingBuffer, taskId, isStreaming }
+const streamingCacheMap = new Map();
 const isWaitingForChunk = computed(
   () => isStreaming.value && typingBuffer.value.length === 0,
 ); // 是否在等待下一段流式响应
@@ -62,6 +66,7 @@ const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提
 let lastChatId = null;
 let pendingResumeInfo = null; // 待处理的缓存信息（在挂载时读取，在 watch 中执行）
 let loadChatAbortController = null; // 用于取消旧的 loadChat 请求
+let currentStreamingSessionId = null; // 当前正在流式输出的会话ID
 
 // 模式（本地/在线）（false表示本地，true表示在线）
 const mode = ref(false);
@@ -238,6 +243,9 @@ async function startStream(data) {
     }
   }
 
+  // 记录当前正在流式输出的会话ID
+  currentStreamingSessionId = sid;
+
   try {
     // 发送消息，拿到 taskId
     const res = await chatAPI.postMessage({
@@ -262,6 +270,15 @@ async function startStream(data) {
         if (typeof chunk !== "string") chunk = String(chunk);
         chunk = chunk.replace(/\r\n/g, "\n");
         chunk = chunk.replace(/^data:\s?/gm, "");
+
+        // 检查是否已切换到其他对话，如果是则写入缓存
+        if (String(props.chatId) !== String(sid)) {
+          const cache = streamingCacheMap.get(String(sid));
+          if (cache) {
+            cache.typingBuffer += chunk;
+          }
+          return;
+        }
 
         typingBuffer.value += chunk;
 
@@ -293,6 +310,18 @@ async function startStream(data) {
         lastReceivedChunkId = id;
       },
       onFinish() {
+        // 检查是否已切换到其他对话
+        if (String(props.chatId) !== String(sid)) {
+          // 标记缓存中的流式已完成
+          const cache = streamingCacheMap.get(String(sid));
+          if (cache) {
+            cache.isStreaming = false;
+            cache.streamHandle = null;
+          }
+          currentStreamingSessionId = null;
+          return;
+        }
+
         isStreaming.value = false;
         if (!typingBuffer.value.length && typingTimer) {
           clearInterval(typingTimer);
@@ -300,8 +329,22 @@ async function startStream(data) {
         }
         currentTaskId = null;
         activeStreamHandle = null;
+        currentStreamingSessionId = null;
       },
       onError(err) {
+        // 检查是否已切换到其他对话
+        if (String(props.chatId) !== String(sid)) {
+          // 标记缓存中的流式已完成（出错）
+          const cache = streamingCacheMap.get(String(sid));
+          if (cache) {
+            cache.isStreaming = false;
+            cache.streamHandle = null;
+          }
+          currentStreamingSessionId = null;
+          console.error("流式请求出错:", err);
+          return;
+        }
+
         isStreaming.value = false;
         if (!typingBuffer.value.length && typingTimer) {
           clearInterval(typingTimer);
@@ -310,6 +353,7 @@ async function startStream(data) {
         console.error("流式请求出错:", err);
         currentTaskId = null;
         activeStreamHandle = null;
+        currentStreamingSessionId = null;
       },
     });
   } catch (err) {
@@ -373,7 +417,7 @@ function resumeStream(taskId, sessionId, chunkId, initialContent = "") {
         }, 20);
       }
     },
-    lastChunkId(id) {
+    onChunkId(id) {
       lastReceivedChunkId = id;
     },
     onFinish() {
@@ -544,24 +588,90 @@ watch(
       return;
     }
 
-    // TODO：这里要改成切换会话不冲突
-    // 3）如果当前正在流式输出，不要重复加载
-    if (isStreaming.value) {
+    // 3）如果当前正在流式输出，将状态保存到缓存（SSE继续运行，内容写入缓存）
+    if (isStreaming.value && oldId) {
+      // 保存当前流式状态到缓存（只保存正在流式的AI消息，不保存整个消息列表）
+      streamingCacheMap.set(String(oldId), {
+        activeMessage: activeAssistantMessage.value, // 正在流式的AI消息对象
+        typingBuffer: typingBuffer.value,
+        taskId: currentTaskId,
+        isStreaming: true,
+      });
+
+      // 清理当前界面的流式状态（但不停止SSE）
+      isStreaming.value = false;
+      typingBuffer.value = "";
+      if (typingTimer) {
+        clearInterval(typingTimer);
+        typingTimer = null;
+      }
+      activeAssistantMessage.value = null;
+      currentTaskId = null;
+    }
+
+    // 4）无论如何先加载历史记录
+    await loadChat(newId);
+
+    // 5）检查是否有缓存的流式状态，有则把缓存的AI消息追加到末尾继续流式
+    const cachedState = streamingCacheMap.get(String(newId));
+    if (cachedState) {
+      // 从缓存中取出正在流式的AI消息
+      const cachedActiveMsg = cachedState.activeMessage;
+
+      if (cachedActiveMsg) {
+        // 把缓存中已收到的内容（包括缓冲区）一次性全部显示
+        // 将缓冲区内容直接追加到消息内容中
+        cachedActiveMsg.content += cachedState.typingBuffer;
+
+        // 把AI消息追加到当前消息列表末尾
+        currentMessages.value.push(cachedActiveMsg);
+        activeAssistantMessage.value = cachedActiveMsg;
+      }
+
+      // 恢复流式相关状态（缓冲区清空，因为已经一次性显示了）
+      typingBuffer.value = "";
+      currentTaskId = cachedState.taskId;
+      isStreaming.value = cachedState.isStreaming;
+
+      // 如果还在流式中，启动打字机定时器接收后续新内容
+      if (isStreaming.value) {
+        if (!typingTimer) {
+          typingTimer = setInterval(() => {
+            if (!typingBuffer.value.length) {
+              if (!isStreaming.value) {
+                clearInterval(typingTimer);
+                typingTimer = null;
+                activeAssistantMessage.value = null;
+                streamingCacheMap.delete(String(newId));
+              }
+              return;
+            }
+            const nextChar = typingBuffer.value[0];
+            typingBuffer.value = typingBuffer.value.slice(1);
+            const msg = activeAssistantMessage.value;
+            if (msg) {
+              msg.content += nextChar;
+            }
+            nextTick(() => scrollToBottom());
+          }, 20);
+        }
+      }
+
+      // 清除缓存
+      streamingCacheMap.delete(String(newId));
+
+      await nextTick();
+      await scrollToBottom(true);
       return;
     }
 
-    // 4）普通情况：正常根据 newId 加载会话
-    await loadChat(newId);
-
-    // 5）加载完成后，检查是否需要续传
+    // 6）加载完成后，检查是否需要续传（页面刷新场景）
     if (pendingResumeInfo) {
       const { taskId, sessionId, lastChunkId, content } = pendingResumeInfo;
       if (taskId && sessionId && String(sessionId) === String(newId)) {
         resumeStream(taskId, sessionId, lastChunkId, content);
-      } else {
-        localStorage.removeItem(SSE_RESUME_INFO_KEY);
       }
-      pendingResumeInfo = null; // 清除，只执行一次
+      pendingResumeInfo = null;
     }
   },
 );
