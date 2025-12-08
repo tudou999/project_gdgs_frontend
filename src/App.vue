@@ -1,11 +1,8 @@
 <script setup lang="ts">
+// TODO：普通用户显示个人中心按钮
 import { RouterLink, RouterView } from "vue-router";
 import { useDark, useToggle } from "@vueuse/core";
-import {
-  SunIcon,
-  MoonIcon,
-  ArrowRightOnRectangleIcon,
-} from "@heroicons/vue/24/outline";
+import { SunIcon, MoonIcon } from "@heroicons/vue/24/outline";
 import { useRouter } from "vue-router";
 import { ref, computed, onMounted } from "vue";
 import { User, SwitchButton, HomeFilled } from "@element-plus/icons-vue";
@@ -63,6 +60,16 @@ const showLogOutButton = computed(() => {
 const handleGoAdmin = () => {
   router.push("/root");
 };
+
+// 跳转到个人中心
+const handleGoUser = () => {
+  router.push("/user");
+};
+
+// 非管理员显示个人中心按钮
+const showUserButton = computed(() => {
+  return showLogOutButton.value && !isAdmin.value;
+});
 
 // 组件挂载时检查登录状态
 onMounted(() => {
@@ -128,6 +135,19 @@ router.beforeEach((to, from, next) => {
             <User />
           </el-icon>
           管理员中心
+        </el-button>
+        <el-button
+          plain
+          type="success"
+          size="large"
+          v-if="showUserButton"
+          @click="handleGoUser"
+          title="个人中心"
+        >
+          <el-icon style="vertical-align: middle">
+            <User />
+          </el-icon>
+          个人中心
         </el-button>
         <el-button
           plain
@@ -207,6 +227,7 @@ body {
     text-decoration: none;
     color: inherit;
     background: #007cf0;
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }

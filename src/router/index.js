@@ -58,6 +58,11 @@ const routes = [
     name: "Upload",
     component: lazyLoad("Upload"),
   },
+  {
+    path: "/user",
+    name: "User",
+    component: lazyLoad("User"),
+  },
 ];
 
 const router = createRouter({
