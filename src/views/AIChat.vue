@@ -110,7 +110,6 @@
 </template>
 
 <script setup>
-// TODO：频繁切换会话会导致请求堆积，考虑增加节流或取消前一个请求的逻辑
 import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";

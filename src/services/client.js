@@ -13,6 +13,10 @@ const addAuthHeader = (config) => {
 
 // 统一错误处理
 const handleResponseError = (error) => {
+  // 主动取消的请求不提示错误
+  if (axios.isCancel(error)) {
+    return Promise.reject(error);
+  }
   if (error.response?.status !== 200) {
     ElMessage.warning("网络错误！请联系管理员");
   }

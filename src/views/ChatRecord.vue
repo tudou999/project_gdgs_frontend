@@ -61,6 +61,7 @@ const isWaitingForChunk = computed(
 const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提升到真实会话
 let lastChatId = null;
 let pendingResumeInfo = null; // 待处理的缓存信息（在挂载时读取，在 watch 中执行）
+let loadChatAbortController = null; // 用于取消旧的 loadChat 请求
 
 // 模式（本地/在线）（false表示本地，true表示在线）
 const mode = ref(false);
@@ -80,6 +81,13 @@ function resetChatView() {
 
 // 加载指定会话的消息列表
 async function loadChat(chatId) {
+  // 取消之前的请求，避免旧请求覆盖新请求的结果
+  if (loadChatAbortController) {
+    loadChatAbortController.abort();
+  }
+  loadChatAbortController = new AbortController();
+  const signal = loadChatAbortController.signal;
+
   // 重置分页状态
   resetPagination();
   try {
@@ -88,6 +96,7 @@ async function loadChat(chatId) {
       chatId,
       pageNum.value,
       pageSize.value,
+      signal,
     );
 
     const pageData = response.data || {};
@@ -108,6 +117,10 @@ async function loadChat(chatId) {
     await nextTick();
     await scrollToBottom(true);
   } catch (error) {
+    // 如果是主动取消的请求，不做处理
+    if (error?.name === "CanceledError" || signal.aborted) {
+      return;
+    }
     console.error("加载对话消息失败:", error);
     currentMessages.value = [];
   }

@@ -103,13 +103,14 @@ export const chatAPI = {
   },
 
   // 分页获取对话聊天记录
-  getChatMessagesByPage(chatId, pageNum = 1, pageSize = 10) {
+  getChatMessagesByPage(chatId, pageNum = 1, pageSize = 10, signal = null) {
     return apiClient.get(`/messages`, {
       params: {
         sessionId: chatId,
         pageNum: pageNum,
         pageSize: pageSize,
       },
+      signal: signal,
     });
   },
 };
