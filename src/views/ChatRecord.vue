@@ -46,12 +46,13 @@ const pageSize = ref(10); // 每页条数
 const total = ref(0); // 当前会话消息总数
 const loadingMore = ref(false); // 是否正在加载上一页历史，避免重复请求
 const hasMore = ref(true); // 是否还有更多历史可加载
+const showSkeleton = ref(false); // 是否显示骨架屏（加载超过300ms时显示）
+let skeletonTimer = null; // 骨架屏延迟显示定时器
 const typingBuffer = ref(""); // 打字机效果缓冲区，保存尚未输出到界面的内容
 let typingTimer = null; // 打字机定时器句柄，用于逐字符刷新界面
 let currentTaskId = null; // 当前对话对应的后端任务 ID，用于手动停止
 let lastReceivedChunkId = null; // 最后收到的 SSE chunk ID，用于断点续传
 const SSE_RESUME_INFO_KEY = "sseResumeInfo";
-let activeStreamHandle = null; // 当前 fetchEventSource 句柄，用于取消流式输出
 const activeAssistantMessage = ref(null); // 正在流式输出的 AI 消息对象
 
 // 流式对话缓存：切换对话时保存正在进行的流式状态，以便切换回来时恢复
@@ -63,10 +64,8 @@ const isWaitingForChunk = computed(
 
 // 会话提升状态
 const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提升到真实会话
-let lastChatId = null;
 let pendingResumeInfo = null; // 待处理的缓存信息（在挂载时读取，在 watch 中执行）
 let loadChatAbortController = null; // 用于取消旧的 loadChat 请求
-let currentStreamingSessionId = null; // 当前正在流式输出的会话ID
 
 // 模式（本地/在线）（false表示本地，true表示在线）
 const mode = ref(false);
@@ -84,6 +83,7 @@ function resetChatView() {
   resetPagination();
 }
 
+const isInitialLoading = ref(false); // 是否正在加载当前会话的第一页
 // 加载指定会话的消息列表
 async function loadChat(chatId) {
   // 取消之前的请求，避免旧请求覆盖新请求的结果
@@ -94,6 +94,7 @@ async function loadChat(chatId) {
   const signal = loadChatAbortController.signal;
 
   // 重置分页状态
+  isInitialLoading.value = true;
   resetPagination();
   try {
     // 加载第一页消息
@@ -128,11 +129,14 @@ async function loadChat(chatId) {
     }
     console.error("加载对话消息失败:", error);
     currentMessages.value = [];
+  } finally {
+    isInitialLoading.value = false;
   }
 }
 
-// 加载更多历史消息（上一页）
+// 加载更多历史消息（无限滚动）
 async function loadMoreMessages() {
+  console.log("🚀🚀🚀🚀");
   if (loadingMore.value || !hasMore.value || !props.chatId) return;
   loadingMore.value = true;
 
@@ -243,9 +247,6 @@ async function startStream(data) {
     }
   }
 
-  // 记录当前正在流式输出的会话ID
-  currentStreamingSessionId = sid;
-
   try {
     // 发送消息，拿到 taskId
     const res = await chatAPI.postMessage({
@@ -257,7 +258,7 @@ async function startStream(data) {
     currentTaskId = taskId;
 
     // 根据 taskId 订阅 SSE 流
-    activeStreamHandle = chatAPI.subscribeChatStream({
+    chatAPI.subscribeChatStream({
       taskId: taskId,
       sessionId: sid,
       onChunk(rawData) {
@@ -318,7 +319,6 @@ async function startStream(data) {
             cache.isStreaming = false;
             cache.streamHandle = null;
           }
-          currentStreamingSessionId = null;
           return;
         }
 
@@ -328,8 +328,6 @@ async function startStream(data) {
           typingTimer = null;
         }
         currentTaskId = null;
-        activeStreamHandle = null;
-        currentStreamingSessionId = null;
       },
       onError(err) {
         // 检查是否已切换到其他对话
@@ -340,7 +338,6 @@ async function startStream(data) {
             cache.isStreaming = false;
             cache.streamHandle = null;
           }
-          currentStreamingSessionId = null;
           console.error("流式请求出错:", err);
           return;
         }
@@ -352,8 +349,6 @@ async function startStream(data) {
         }
         console.error("流式请求出错:", err);
         currentTaskId = null;
-        activeStreamHandle = null;
-        currentStreamingSessionId = null;
       },
     });
   } catch (err) {
@@ -364,7 +359,6 @@ async function startStream(data) {
       typingTimer = null;
     }
     console.error("启动或订阅聊天流失败:", err);
-    activeStreamHandle = null;
   }
 }
 
@@ -382,7 +376,7 @@ function resumeStream(taskId, sessionId, chunkId, initialContent = "") {
   activeAssistantMessage.value =
     currentMessages.value[currentMessages.value.length - 1];
 
-  activeStreamHandle = chatAPI.subscribeChatStream({
+  chatAPI.subscribeChatStream({
     taskId: taskId,
     sessionId: sessionId,
     resumeFromChunkId: chunkId,
@@ -427,7 +421,6 @@ function resumeStream(taskId, sessionId, chunkId, initialContent = "") {
         typingTimer = null;
       }
       currentTaskId = null;
-      activeStreamHandle = null;
       // 流正常结束，清除 localStorage 中的续传信息
       localStorage.removeItem(SSE_RESUME_INFO_KEY);
     },
@@ -439,7 +432,6 @@ function resumeStream(taskId, sessionId, chunkId, initialContent = "") {
       }
       console.error("流式请求出错:", err);
       currentTaskId = null;
-      activeStreamHandle = null;
       // 出错时也清除续传信息，避免反复重试
       localStorage.removeItem(SSE_RESUME_INFO_KEY);
     },
@@ -490,6 +482,11 @@ async function scrollToBottom(force = false) {
 
 // 监听消息容器滚动事件，实现分页加载/自动滚动控制
 function handleMessagesScroll() {
+  if (isInitialLoading.value) {
+    // 正在加载第一页时，不允许触发“加载更多”
+    return;
+  }
+
   const container = messagesRef.value;
   if (!container) return;
 
@@ -571,9 +568,6 @@ onMounted(() => {
 watch(
   () => props.chatId,
   async (newId, oldId) => {
-    // 记录上一次 id，方便调试/条件判断
-    lastChatId = oldId;
-
     // 1）新值为 0：表示又回到本地临时会话，直接重置即可
     if (newId == 0 || newId == null) {
       resetChatView();
@@ -609,10 +603,28 @@ watch(
       currentTaskId = null;
     }
 
-    // 4）无论如何先加载历史记录
+    // 4）立即清空当前对话记录，避免网络卡顿时显示旧对话
+    resetChatView();
+
+    // 5）设置骨架屏延迟显示（300ms后如果还在加载则显示）
+    if (skeletonTimer) {
+      clearTimeout(skeletonTimer);
+    }
+    skeletonTimer = setTimeout(() => {
+      showSkeleton.value = true;
+    }, 300);
+
+    // 6）加载历史记录
     await loadChat(newId);
 
-    // 5）检查是否有缓存的流式状态，有则把缓存的AI消息追加到末尾继续流式
+    // 7）加载完成，清除骨架屏
+    if (skeletonTimer) {
+      clearTimeout(skeletonTimer);
+      skeletonTimer = null;
+    }
+    showSkeleton.value = false;
+
+    // 8）检查是否有缓存的流式状态，有则把缓存的AI消息追加到末尾继续流式
     const cachedState = streamingCacheMap.get(String(newId));
     if (cachedState) {
       // 从缓存中取出正在流式的AI消息
@@ -665,7 +677,7 @@ watch(
       return;
     }
 
-    // 6）加载完成后，检查是否需要续传（页面刷新场景）
+    // 9）加载完成后，检查是否需要续传（页面刷新场景）
     if (pendingResumeInfo) {
       const { taskId, sessionId, lastChunkId, content } = pendingResumeInfo;
       if (taskId && sessionId && String(sessionId) === String(newId)) {
@@ -690,6 +702,10 @@ onBeforeUnmount(() => {
     clearInterval(typingTimer);
     typingTimer = null;
   }
+  if (skeletonTimer) {
+    clearTimeout(skeletonTimer);
+    skeletonTimer = null;
+  }
   // 组件正常卸载时也保存续传信息
   saveResumeInfo();
 });
@@ -698,19 +714,39 @@ onBeforeUnmount(() => {
 <template>
   <div class="chat-record">
     <div class="messages" ref="messagesRef">
-      <ChatMessage
-        v-for="(message, index) in currentMessages"
-        :key="index"
-        :message="{
-          role: message.senderType,
-          content: message.content,
-          stopped: message.stopped,
-          createdAt: message.created,
-        }"
-        :isStreaming="isStreaming"
-        :isWaiting="isWaitingForChunk && message === activeAssistantMessage"
-        @regenerate="handleRegenerate"
-      />
+      <!-- 骨架屏：加载超过300ms时显示，模拟一问一答的对话形式 -->
+      <template v-if="showSkeleton">
+        <template v-for="i in 2" :key="'skeleton-pair-' + i">
+          <!-- 用户消息骨架（右侧） -->
+          <div class="skeleton-message skeleton-user">
+            <div class="skeleton-bubble">
+              <el-skeleton :rows="1" animated />
+            </div>
+          </div>
+          <!-- AI消息骨架（左侧） -->
+          <div class="skeleton-message skeleton-ai">
+            <div class="skeleton-bubble">
+              <el-skeleton :rows="2" animated />
+            </div>
+          </div>
+        </template>
+      </template>
+      <!-- 消息列表 -->
+      <template v-else>
+        <ChatMessage
+          v-for="(message, index) in currentMessages"
+          :key="index"
+          :message="{
+            role: message.senderType,
+            content: message.content,
+            stopped: message.stopped,
+            createdAt: message.created,
+          }"
+          :isStreaming="isStreaming"
+          :isWaiting="isWaitingForChunk && message === activeAssistantMessage"
+          @regenerate="handleRegenerate"
+        />
+      </template>
     </div>
     <div class="input-area">
       <div class="input-wrapper">
@@ -772,6 +808,43 @@ onBeforeUnmount(() => {
     max-width: 48rem;
     width: 100%;
     margin: 0 auto;
+  }
+
+  // 骨架屏消息样式，模拟聊天对话形式
+  .skeleton-message {
+    display: flex;
+    max-width: 48rem;
+    width: 100%;
+    margin: 0 auto;
+
+    .skeleton-bubble {
+      padding: 0.75rem 1.25rem;
+      border-radius: 1.25rem;
+      background: var(--el-bg-color);
+    }
+
+    // 用户消息：右对齐，短一点
+    &.skeleton-user {
+      justify-content: flex-end;
+
+      .skeleton-bubble {
+        width: 40%;
+        min-width: 120px;
+        max-width: 280px;
+        background: var(--el-color-primary-light-9);
+      }
+    }
+
+    // AI消息：左对齐，长一点
+    &.skeleton-ai {
+      justify-content: flex-start;
+
+      .skeleton-bubble {
+        width: 70%;
+        min-width: 200px;
+        max-width: 500px;
+      }
+    }
   }
 }
 
