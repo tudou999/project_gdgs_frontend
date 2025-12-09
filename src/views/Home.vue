@@ -1,7 +1,11 @@
 <template>
   <div class="home" :class="{ dark: isDark }">
     <div class="container">
-      <h1 class="title" v-if="showGreeting">{{ greeting }}好，{{ username }}！</h1>
+      <h1 class="title">
+        <span :class="{ visible: showGreeting }"
+          >{{ greeting }}好，{{ username }}！</span
+        >
+      </h1>
       <div class="cards-grid">
         <router-link
           v-for="app in aiApps"
@@ -102,10 +106,20 @@ async function loadUserInfo() {
     text-align: center;
     font-size: 2.5rem;
     margin-bottom: 3rem;
+    margin-top: 20px;
     background: linear-gradient(45deg, #007cf0, #00dfd8);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: fadeIn 1s ease-out;
+    min-height: 1.2em; // 保持占位高度
+
+    span {
+      display: inline-block;
+      opacity: 0;
+
+      &.visible {
+        animation: fadeIn 1s ease-out forwards;
+      }
+    }
   }
 
   .cards-grid {
