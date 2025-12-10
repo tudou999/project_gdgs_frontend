@@ -1,6 +1,6 @@
 import { useUserStore } from "../stores/user";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { apiClient } from "./client";
+import { apiClient } from "./client.ts";
 
 const SESSIONS_API_BASE_URL = "/sessions";
 const ASSISTANT_API_BASE_URL = "/assistant";
@@ -18,28 +18,24 @@ export const chatAPI = {
     });
   },
 
-  // 根据 taskId 订阅 SSE 流
+  // 订阅 SSE 流
   subscribeChatStream({
-    taskId,
     sessionId,
     onChunk,
     onFinish,
     onError,
-    onChunkId,
-    resumeFromChunkId,
+    onId,
+    lastChunkId,
   }) {
-    const sseUrl = new URL(`/api/v1/assistant/sse/${taskId}`, BASE);
+    const sseUrl = new URL(`/api/v1/assistant/sse/${sessionId}`, BASE);
 
-    // 添加 sessionId 参数；lastChunkId 通过请求头传递给后端
-    const params = { sessionId: sessionId };
-    sseUrl.search = new URLSearchParams(params).toString();
     const controller = new AbortController();
 
     const finished = fetchEventSource(sseUrl, {
       method: "GET",
       headers: {
         Authorization: userStore.token,
-        "Last-Chunk-ID": resumeFromChunkId,
+        "Last-Chunk-ID": lastChunkId,
       },
       openWhenHidden: true,
       signal: controller.signal,
@@ -48,7 +44,7 @@ export const chatAPI = {
       onmessage(event) {
         if (!event.data) return;
         // 返回 chunk 及其 id
-        onChunkId(event.id);
+        onId(event.id);
         onChunk && onChunk(event.data);
       },
 
@@ -70,11 +66,8 @@ export const chatAPI = {
   },
 
   // 手动停止对话
-  postStopMessage(sessionId, taskId) {
-    return apiClient.post(`${ASSISTANT_API_BASE_URL}/stop`, {
-      sessionId: sessionId,
-      taskId: taskId,
-    });
+  patchStopMessage(sessionId) {
+    return apiClient.patch(`${SESSIONS_API_BASE_URL}/${sessionId}`);
   },
 
   // 获取聊天历史列表
