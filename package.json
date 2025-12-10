@@ -3,6 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "lint-staged": {
+    "*.{js,ts,vue}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
   "scripts": {
     "dev": "vite --host=0.0.0.0",
     "build": "run-p type-check \"build-only {@}\" --",
@@ -38,6 +44,9 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/tsconfig": "^0.7.0",
     "consola": "^3.4.2",
+    "eslint-plugin-vue": "^10.6.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "npm-run-all2": "^7.0.2",
     "path": "^0.12.7",
     "prettier": "3.6.2",
