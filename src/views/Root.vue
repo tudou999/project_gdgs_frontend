@@ -22,13 +22,13 @@
         <el-table-column label="角色" align="center" width="100">
           <template #default="scope">
             <span :class="['role-badge', scope.row.role]">
-              {{ getName(scope.row.role) }}
+              {{ getName(scope.row) }}
             </span>
           </template>
         </el-table-column>
         <el-table-column label="创建时间" width="160" align="center">
           <template #default="scope">
-            {{ formatDate(scope.row.createTime) }}
+            {{ formatDate(scope.row) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" align="center" width="90">
@@ -50,19 +50,19 @@
     <!-- 分页 -->
     <el-pagination
       class="pagination-wrapper"
-      v-if="!loading && pagination"
+      v-if="!loading && paginationInfo"
       size="large"
       background
       layout="prev, pager, next"
-      :total="pagination.total"
-      :page-size="pageSize"
-      :current-page="pagination.current"
+      :total="paginationInfo.total"
+      page-size="10"
+      :current-page="paginationInfo.current"
       @current-change="changePage"
     />
   </el-container>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
 
 defineOptions({
@@ -70,73 +70,68 @@ defineOptions({
 });
 
 import { ref, onMounted } from "vue";
-import { RootAPI } from "../services/user.js";
+import { RootAPI } from "../services/user.ts";
+import type { UserType, PaginationInfoType } from "../interface/Troot.ts";
+import { useGetCode } from "../hooks/useTools.ts";
 
-const users = ref([]);
-const loading = ref(false);
-const error = ref(null);
-const pagination = ref(null);
-const currentPage = ref(1);
-const pageSize = ref(10);
+const loading = ref<boolean>(false); // 加载状态
+const paginationInfo = ref<PaginationInfoType | null>(null); // 分页信息
+const currentPage = ref<number>(1); // 当前页码
 
+const users = ref<UserType[]>([]);
 // 加载用户列表
-const loadUsers = async () => {
+const loadUsers = async (): Promise<void> => {
   loading.value = true;
-  error.value = null;
 
   try {
-    const response = await RootAPI.getAllUsers(
-      currentPage.value,
-      pageSize.value,
-    );
+    const res = await RootAPI.getAllUsers(currentPage.value);
 
-    if (getCode(response)) {
-      users.value = (response.data.records || []).slice().sort((a, b) => {
-        const aIsAdmin = a.role === "ADMIN";
-        const bIsAdmin = b.role === "ADMIN";
+    if (useGetCode(res)) {
+      users.value = (res.data.records || [])
+        .slice()
+        .sort((a: UserType, b: UserType) => {
+          const aIsAdmin = a.role === "ADMIN";
+          const bIsAdmin = b.role === "ADMIN";
 
-        if (aIsAdmin !== bIsAdmin) {
-          return aIsAdmin ? -1 : 1;
-        }
+          if (aIsAdmin !== bIsAdmin) {
+            return aIsAdmin ? -1 : 1;
+          }
 
-        const emailA = (a.email || "").toLowerCase();
-        const emailB = (b.email || "").toLowerCase();
+          const emailA = (a.email || "").toLowerCase();
+          const emailB = (b.email || "").toLowerCase();
 
-        if (emailA < emailB) return -1;
-        if (emailA > emailB) return 1;
-        return 0;
-      });
+          if (emailA < emailB) return -1;
+          if (emailA > emailB) return 1;
+          return 0;
+        });
 
-      pagination.value = {
-        current: Number(response.data.current),
-        pages: Number(response.data.pages),
-        total: Number(response.data.total),
+      paginationInfo.value = {
+        current: res.data.current,
+        pages: res.data.pages,
+        total: res.data.total,
       };
     } else {
-      error.value = response.msg;
-      ElMessage.error(error.value);
     }
   } catch (err) {
-    ElMessage.error("加载用户列表失败:", err);
-    error.value = "网络错误，请检查网络连接";
+    console.error("加载用户失败", err);
+    ElMessage.error("加载用户列表失败，请稍后重试");
   } finally {
     loading.value = false;
   }
 };
 
 // 切换页面
-const changePage = async (page) => {
-  if (page < 1 || page > pagination.value.pages) return;
+const changePage = async (page: number) => {
+  if (page < 1 || page > paginationInfo.value!.pages) return;
 
   currentPage.value = page;
   await loadUsers();
 };
 
 // 删除用户
-// TODO：email需要改成name
-const deleteUser = (user) => {
+const deleteUser = (user: UserType) => {
   ElMessageBox.confirm(
-    `确定要删除用户 ${user?.email} 吗？此操作不可撤销。`,
+    `确定要删除用户 ${user.name} 吗？此操作不可撤销。`,
     "注意！",
     {
       confirmButtonText: "OK",
@@ -149,13 +144,13 @@ const deleteUser = (user) => {
       if (!user) return;
 
       try {
-        const response = await RootAPI.deleteUser(user.id);
+        const res = await RootAPI.deleteUser(user.id);
 
-        if (getCode(response)) {
+        if (useGetCode(res)) {
           ElMessage.success("删除成功！");
           await loadUsers();
         } else {
-          ElMessage.error(response.msg);
+          ElMessage.error(res.msg);
         }
       } catch (err) {
         console.error("删除用户失败:", err);
@@ -166,24 +161,20 @@ const deleteUser = (user) => {
 };
 
 // 是否显示删除按钮
-const showButton = (user) => {
-  return user.auth === 0;
+const showButton = (user: UserType) => {
+  return user.role === "USER";
 };
 
 // 格式化日期
-const formatDate = (dateString) => {
-  if (!dateString) return "-";
-  const date = new Date(dateString);
+const formatDate = (user: UserType) => {
+  if (!user.created) return "-";
+  const date = new Date(user.created);
   return date.toLocaleString("zh-CN");
 };
 
 // 获得用户权限信息
-const getName = (role) => (role === "ADMIN" ? "管理员" : "普通用户");
-
-// 返回操作码
-const getCode = (response) => {
-  return response.code === 200;
-};
+const getName = (user: UserType) =>
+  user.role === "ADMIN" ? "管理员" : "普通用户";
 
 // 组件挂载时加载数据
 onMounted(() => {

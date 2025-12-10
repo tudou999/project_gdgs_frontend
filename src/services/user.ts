@@ -1,10 +1,12 @@
 import { apiClient } from "./client";
+import type { LoginFormType } from "@/interface/Tlogin.ts";
+import type { RegisterFormType } from "@/interface/Tregister.ts";
 
 const USER_API_BASE_URL = "/user";
 
 export const SignAPI = {
   // 用户登录
-  login(loginFormValue) {
+  login(loginFormValue: LoginFormType) {
     return apiClient.post(`${USER_API_BASE_URL}/login`, {
       email: loginFormValue.email,
       password: loginFormValue.password,
@@ -12,7 +14,7 @@ export const SignAPI = {
   },
 
   // 用户注册
-  register(registerFormValue) {
+  register(registerFormValue: RegisterFormType) {
     return apiClient.post(`${USER_API_BASE_URL}/register`, {
       email: registerFormValue.email,
       password: registerFormValue.password,
@@ -24,17 +26,17 @@ export const SignAPI = {
 
 export const RootAPI = {
   // 获取所有用户列表（管理员接口）
-  getAllUsers(pageNum, pageSize) {
+  getAllUsers(pageNum: number) {
     return apiClient.get(`${USER_API_BASE_URL}/admin`, {
       params: {
         pageNum: pageNum,
-        pageSize: pageSize,
+        pageSize: 10,
       },
     });
   },
 
   // 删除用户（管理员接口）
-  deleteUser(userId) {
+  deleteUser(userId: string) {
     return apiClient.delete(`${USER_API_BASE_URL}/admin/${userId}`);
   },
 };

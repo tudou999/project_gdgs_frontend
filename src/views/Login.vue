@@ -80,10 +80,11 @@ defineOptions({
 
 import { type Ref, ref } from "vue";
 import { useRouter } from "vue-router";
-import { SignAPI } from "../services/user.js";
+import { SignAPI } from "../services/user.ts";
 import { ElMessage } from "element-plus";
 import { useUserStore } from "../stores/user";
-import type { LoginFormType } from "../interface/login.ts";
+import type { LoginFormType } from "../interface/Tlogin.ts";
+import type { ResType } from "../interface/Tgeneral.ts";
 
 const router = useRouter();
 const userStore = useUserStore();

@@ -137,9 +137,9 @@ defineOptions({
 import { type Ref, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useDark } from "@vueuse/core";
-import { SignAPI } from "../services/user.js";
+import { SignAPI } from "../services/user.ts";
 import { ElMessage } from "element-plus";
-import type { RegisterFormType } from "../interface/register.ts";
+import type { RegisterFormType } from "../interface/Tregister.ts";
 
 const isDark = useDark();
 const router = useRouter();
