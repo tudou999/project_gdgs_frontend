@@ -3,7 +3,7 @@
     <div class="container">
       <h1 class="title">
         <span :class="{ visible: showGreeting }"
-          >{{ greeting }}好，{{ username }}！</span
+          >{{ time }}好，{{ username }}！</span
         >
       </h1>
       <div class="cards-grid">
@@ -24,38 +24,30 @@
   </div>
 </template>
 
-<script setup>
-// 挂载时加载用户信息
-onMounted(loadUserInfo);
-
+<script setup lang="ts">
 defineOptions({
   name: "Home",
 });
 
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, type Ref } from "vue";
 import { useDark } from "@vueuse/core";
 import {
   ChatBubbleLeftRightIcon,
   DocumentTextIcon,
 } from "@heroicons/vue/24/outline";
 import { UseAPI } from "../services/user";
-
+import type { HomeCardType } from "@/interface/home.ts";
 const isDark = useDark();
 
-// 用户名
-const username = ref("未知用户");
-// 是否显示欢迎语
-const showGreeting = ref(false);
-
 // 根据当前时间生成问候语
-const greeting = computed(() => {
+const time = computed(() => {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return "早上";
   if (hour >= 12 && hour < 18) return "下午";
   return "晚上";
 });
 
-const aiApps = ref([
+const aiApps = ref<HomeCardType>([
   {
     id: 1,
     title: "业务咨询",
@@ -72,8 +64,11 @@ const aiApps = ref([
   },
 ]);
 
+// 用户相关状态
+const username: Ref<String> = ref("未知用户"); // 用户名
+const showGreeting: Ref<String> = ref(false); // 是否显示问候语
 // 获取当前用户信息
-async function loadUserInfo() {
+const loadUserInfo = async (): Promise<void> => {
   try {
     const res = await UseAPI.getUserInfo();
     if (res.code === 200) {
@@ -86,7 +81,10 @@ async function loadUserInfo() {
     console.error("获取用户信息失败:", error);
     showGreeting.value = false;
   }
-}
+};
+
+// 挂载时加载用户信息
+onMounted(loadUserInfo);
 </script>
 
 <style scoped lang="scss">
