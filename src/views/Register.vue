@@ -112,7 +112,10 @@
         <div class="register-footer">
           <p class="login-text">
             已有账号？
-            <a href="#" class="login-link" @click.prevent="gotoLogin"
+            <a
+              href="#"
+              class="login-link"
+              @click.prevent="router.push('/login')"
               >立即登录</a
             >
           </p>
@@ -122,7 +125,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { Hide, InfoFilled, Lock, User, View } from "@element-plus/icons-vue";
 
 defineOptions({
@@ -131,45 +134,44 @@ defineOptions({
 
 // TODO: 表单校验正则化
 // TODO: 注册时填写用户名
-import { ref } from "vue";
+import { type Ref, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useDark } from "@vueuse/core";
 import { SignAPI } from "../services/user.js";
 import { ElMessage } from "element-plus";
+import type { RegisterFormType } from "../interface/register.ts";
 
 const isDark = useDark();
 const router = useRouter();
 
-const registerForm = ref({
+const registerForm: Ref<RegisterFormType> = ref({
+  name: "",
   email: "",
   password: "",
   confirmPassword: "",
-  name: "",
-});
+}); // 注册表单数据
 
-const showPassword = ref(false);
-const showConfirmPassword = ref(false);
-const isLoading = ref(false);
+const showPassword: Ref<boolean> = ref(false); // 显示/隐藏密码
+const showConfirmPassword: Ref<boolean> = ref(false); // 显示/隐藏确认密码
+const isLoading: Ref<boolean> = ref(false); // 注册按钮加载状态
 
 // 注册处理函数
-const handleRegister = async () => {
+const handleRegister = async (): Promise<void> => {
   const { name, email, password, confirmPassword } = registerForm.value;
 
+  // 基本表单验证
   if (!name) {
     ElMessage.warning("请填写用户名称");
     return;
   }
-
   if (!email) {
     ElMessage.warning("请填写邮箱地址");
     return;
   }
-
   if (!password) {
     ElMessage.warning("请填写密码");
     return;
   }
-
   if (!confirmPassword) {
     ElMessage.warning("请填写确认密码");
     return;
@@ -179,7 +181,7 @@ const handleRegister = async () => {
   try {
     const response = await SignAPI.register(registerForm.value);
     if (response.code === 200) {
-      router.push("/home");
+      await router.push("/login");
       ElMessage.success("注册成功！");
     } else {
       ElMessage.error(response.msg);
@@ -189,11 +191,6 @@ const handleRegister = async () => {
   } finally {
     isLoading.value = false;
   }
-};
-
-// 跳转到登录页面
-const gotoLogin = () => {
-  router.push("/login");
 };
 </script>
 
