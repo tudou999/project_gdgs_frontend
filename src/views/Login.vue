@@ -58,7 +58,10 @@
       <div class="login-footer">
         <p class="register-text">
           还没有账号？
-          <a href="#" class="register-link" @click.prevent="gotoRegister"
+          <a
+            href="#"
+            class="register-link"
+            @click.prevent="router.push('/register')"
             >立即注册</a
           >
         </p>
@@ -67,59 +70,58 @@
   </el-container>
 </template>
 
-<script setup>
+<script setup lang="ts">
+// TODO：双token机制
 import { Hide, View } from "@element-plus/icons-vue";
 
 defineOptions({
   name: "Login",
 });
 
-import { ref } from "vue";
+import { type Ref, ref } from "vue";
 import { useRouter } from "vue-router";
 import { SignAPI } from "../services/user.js";
 import { ElMessage } from "element-plus";
 import { useUserStore } from "../stores/user";
+import type { LoginFormType } from "../interface/login.ts";
 
 const router = useRouter();
 const userStore = useUserStore();
 
-const loginForm = ref({
+const loginForm: Ref<LoginFormType> = ref({
   email: "",
   password: "",
   rememberMe: false,
-});
+}); // 登录表单数据
 
-const showPassword = ref(false);
-const isLoading = ref(false);
+const showPassword: Ref<boolean> = ref(false); // 是否显示密码
+const isLoading: Ref<boolean> = ref(false); // 加载状态
 
 // 登录处理函数
-const handleLogin = async () => {
+const handleLogin = async (): Promise<void> => {
   if (isLoading.value) return;
 
   isLoading.value = true;
 
   try {
-    const responseJson = await SignAPI.login(loginForm.value);
+    const res = await SignAPI.login(loginForm.value);
 
-    if (responseJson.code === 200) {
-      userStore.setRole(responseJson.data.role);
-      // 使用replace避免重复登录
-      router.replace("/home");
+    if (res.code === 200) {
+      // 设置状态
+      userStore.setRole(res.data.role);
+      userStore.setToken(res.data.token);
+
+      // 跳转到首页
+      await router.replace("/home");
       ElMessage.success("登录成功！");
-      userStore.setToken(responseJson.data.token);
     } else {
-      ElMessage.error(responseJson.msg);
+      ElMessage.error(res.msg);
     }
   } catch (error) {
     ElMessage.warning("登录失败！请联系管理员");
   } finally {
     isLoading.value = false;
   }
-};
-
-// 跳转到注册页面
-const gotoRegister = () => {
-  router.push("/register");
 };
 </script>
 
