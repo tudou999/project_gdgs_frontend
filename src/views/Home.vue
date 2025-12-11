@@ -35,8 +35,8 @@ import {
   ChatBubbleLeftRightIcon,
   DocumentTextIcon,
 } from "@heroicons/vue/24/outline";
-import { UseAPI } from "../services/user";
-import type { HomeCardType } from "@/interface/home.ts";
+import { UseAPI } from "../services/user.ts";
+import type { HomeCardType } from "@/interface/Thome.ts";
 const isDark = useDark();
 
 // 根据当前时间生成问候语
@@ -47,7 +47,7 @@ const time = computed(() => {
   return "晚上";
 });
 
-const aiApps = ref<HomeCardType>([
+const aiApps = ref<HomeCardType[]>([
   {
     id: 1,
     title: "业务咨询",
@@ -65,8 +65,8 @@ const aiApps = ref<HomeCardType>([
 ]);
 
 // 用户相关状态
-const username: Ref<String> = ref("未知用户"); // 用户名
-const showGreeting: Ref<String> = ref(false); // 是否显示问候语
+const username = ref<string>("未知用户"); // 用户名
+const showGreeting = ref<boolean>(false); // 是否显示问候语
 // 获取当前用户信息
 const loadUserInfo = async (): Promise<void> => {
   try {
