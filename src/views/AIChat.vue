@@ -134,6 +134,7 @@ import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
 import ChatRecord from "./ChatRecord.vue";
 import { chatAPI } from "../services/sessions.js";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { useSkeleton } from "@/utils/UtilShowSkeleton.ts";
 
 defineOptions({
   name: "AIChat",
@@ -142,11 +143,6 @@ defineOptions({
 // 会话列表与当前选中状态
 const chatHistory = ref([]); // 所有会话的历史列表
 const currentChatId = ref(null); // 当前选中的会话 ID
-
-// 骨架屏加载状态
-const isLoading = ref(true); // 是否正在加载
-const showSkeleton = ref(false); // 是否显示骨架屏
-let skeletonTimer = null; // 骨架屏延迟定时器
 
 // 重命名相关状态
 const renamingId = ref(null); // 正在重命名的会话 ID
@@ -159,7 +155,7 @@ const isAnyEditing = computed(
     chatHistory.value.some((c) => c.editing !== 0),
 );
 
-// 更新当前会话 ID，并同步到 localStorage
+// 更新当前会话 ID / AI 模式，并同步到 localStorage
 function updateCurrentChatId(id) {
   currentChatId.value = id;
   // 只有有效的 chatId 才存储到 localStorage
@@ -295,19 +291,15 @@ async function deleteSession(id, name) {
     });
 }
 
+// 骨架屏加载状态
+const { skeletonRef: showSkeleton, runWithSkeleton } = useSkeleton();
+
 // 从后端加载会话历史列表，并为每条记录增加 editing 字段
 async function loadChatHistory() {
-  isLoading.value = true;
-  // 300ms 后显示骨架屏
-  skeletonTimer = setTimeout(() => {
-    if (isLoading.value) {
-      showSkeleton.value = true;
-    }
-  }, 300);
   try {
-    const response = await chatAPI.getChatHistory();
-    const history = Array.isArray(response.data)
-      ? response.data.map((item) => ({ ...item, editing: 0 }))
+    const res = await runWithSkeleton(chatAPI.getChatHistory());
+    const history = Array.isArray(res.data)
+      ? res.data.map((item) => ({ ...item, editing: 0 }))
       : [];
     chatHistory.value = history;
 
@@ -341,23 +333,12 @@ async function loadChatHistory() {
     console.error("加载聊天历史失败:", error);
     chatHistory.value = [];
     updateCurrentChatId(0);
-  } finally {
-    clearTimeout(skeletonTimer);
-    isLoading.value = false;
-    showSkeleton.value = false;
   }
 }
 
 // 组件挂载时拉取历史会话列表
 onMounted(() => {
   loadChatHistory();
-});
-
-// 组件卸载时清理定时器
-onUnmounted(() => {
-  if (skeletonTimer) {
-    clearTimeout(skeletonTimer);
-  }
 });
 </script>
 

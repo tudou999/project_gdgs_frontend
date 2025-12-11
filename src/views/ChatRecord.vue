@@ -2,6 +2,7 @@
 // TODO：UI界面优化
 // TODO：将缓存信息存到 IndexedDB，避免 localStorage 容量限制问题
 // TODO：切换对话的时候停止按钮还是显示停止，排查bug
+// TODO：刷新记忆是在线还是本地
 import {
   computed,
   nextTick,
@@ -17,6 +18,7 @@ import IconStop from "../components/icons/IconStop.vue";
 import { ElMessage } from "element-plus";
 import { ChatMode } from "../interface/Tchat.ts";
 import { messageCache } from "../utils/UtilMessageCache.ts";
+import { useSkeleton } from "../utils/UtilShowSkeleton.ts";
 
 defineOptions({
   name: "ChatRecord",
@@ -47,12 +49,13 @@ const pageSize = ref(10); // 每页条数
 const total = ref(0); // 当前会话消息总数
 const loadingMore = ref(false); // 是否正在加载上一页历史，避免重复请求
 const hasMore = ref(true); // 是否还有更多历史可加载
-const showSkeleton = ref(false); // 是否显示骨架屏（加载超过300ms时显示）
 let skeletonTimer = null; // 骨架屏延迟显示定时器
 const typingBuffer = ref(""); // 打字机效果缓冲区，保存尚未输出到界面的内容
 let typingTimer = null; // 打字机定时器句柄，用于逐字符刷新界面
 let lastReceivedChunkId = null; // 最后收到的 SSE chunk ID，用于断点续传
 const activeAssistantMessage = ref(null); // 正在流式输出的 AI 消息对象
+// 是否显示骨架屏
+const { skeletonRef: showSkeleton, runWithSkeleton } = useSkeleton();
 
 const isWaitingForChunk = computed(
   () => isStreaming.value && typingBuffer.value.length === 0,
@@ -73,52 +76,108 @@ function resetPagination() {
   hasMore.value = true;
 }
 
-// 清理流式状态
-const clearStreamingState = () => {
-  isStreaming.value = false;
-  if (typingTimer) {
-    clearInterval(typingTimer);
-    typingTimer = null;
-  }
+// 是否正在加载当前会话的第一页
+const isInitialLoading = ref(false);
 
-  activeAssistantMessage.value = null;
-  typingBuffer.value = "";
-};
+// 发送信息时的sse
+function NewSSE(sessionId) {
+  const newHandle = chatAPI.subscribeChatStream({
+    sessionId: sessionId,
+    lastChunkId: null,
+    onId(id) {
+      lastReceivedChunkId = id;
+    },
+    onChunk(rawData) {
+      let chunk = JSON.parse(rawData);
 
-// 重置聊天记录与分页状态
-function resetChatView() {
-  currentMessages.value = [];
-  resetPagination();
+      if (typeof chunk !== "string") chunk = String(chunk);
+      chunk = chunk.replace(/\r\n/g, "\n");
+      chunk = chunk.replace(/^data:\s?/gm, "");
+
+      if (!activeAssistantMessage.value) {
+        currentMessages.value.push({
+          senderType: "AI",
+          content: "",
+          stopped: false,
+        });
+        activeAssistantMessage.value =
+          currentMessages.value[currentMessages.value.length - 1];
+        isStreaming.value = true;
+      }
+
+      typingBuffer.value += chunk;
+
+      if (!typingTimer)
+        typingTimer = setInterval(() => {
+          if (!typingBuffer.value.length) {
+            if (!isStreaming.value) {
+              clearInterval(typingTimer);
+              typingTimer = null;
+              activeAssistantMessage.value = null;
+            }
+            return;
+          }
+          const nextChar = typingBuffer.value[0];
+          typingBuffer.value = typingBuffer.value.slice(1);
+          const msg = activeAssistantMessage.value;
+          if (msg) msg.content += nextChar;
+
+          nextTick(() => scrollToBottom());
+        }, 20);
+    },
+    onFinish() {
+      // 只有当这个连接确实是当前激活的连接时，才清理全局句柄
+      if (sessionSseHandle === newHandle) sessionSseHandle = null;
+
+      // 关闭流状态
+      isStreaming.value = false;
+      // 流式结束，清除本地缓存
+      messageCache.remove(sessionId);
+    },
+    onError(err) {
+      console.error("[SSE] onError 连接出错", err);
+      if (sessionSseHandle === newHandle) {
+        sessionSseHandle = null;
+      }
+      isStreaming.value = false;
+      if (typingTimer) {
+        clearInterval(typingTimer);
+        typingTimer = null;
+      }
+      activeAssistantMessage.value = null;
+    },
+  });
+
+  // 更新全局句柄
+  sessionSseHandle = newHandle;
 }
 
-const isInitialLoading = ref(false); // 是否正在加载当前会话的第一页
 // 建立当前会话的SSE连接，监听实时消息
 function subscribeToSession(sessionId, sessionCache) {
   let sessionSseArchived = false;
-  let cacheApplied = false; // 标记缓存是否已应用
+  let cacheApplied = false;
 
   // 解析缓存数据
   let cachedContent = "";
   let lastChunkId = null;
   if (sessionCache) {
-    const cacheData = sessionCache;
-    cachedContent = cacheData.content || "";
-    lastChunkId = cacheData.lastChunkId || null;
+    cachedContent = sessionCache.content || "";
+    lastChunkId = sessionCache.lastChunkId || null;
   }
 
   const newHandle = chatAPI.subscribeChatStream({
     sessionId: sessionId,
     lastChunkId: lastChunkId,
     onId(id) {
-      // 已归档
       if (id === "ARCHIVE_FINISHED") {
         sessionSseArchived = true;
         isStreaming.value = false;
-        // 清除本地缓存
         messageCache.remove(sessionId);
         newHandle.cancel();
+        sessionSseHandle = null;
       } else {
         lastReceivedChunkId = id;
+        isStreaming.value = true;
       }
     },
     onChunk(rawData) {
@@ -151,7 +210,7 @@ function subscribeToSession(sessionId, sessionCache) {
 
       typingBuffer.value += chunk;
 
-      if (!typingTimer) {
+      if (!typingTimer)
         typingTimer = setInterval(() => {
           if (!typingBuffer.value.length) {
             if (!isStreaming.value) {
@@ -168,20 +227,13 @@ function subscribeToSession(sessionId, sessionCache) {
 
           nextTick(() => scrollToBottom());
         }, 20);
-      }
     },
     onFinish() {
       // 只有当这个连接确实是当前激活的连接时，才清理全局句柄
-      if (sessionSseHandle === newHandle) {
-        sessionSseHandle = null;
-      }
-      // 清理流状态
+      if (sessionSseHandle === newHandle) sessionSseHandle = null;
+
+      // 关闭流状态
       isStreaming.value = false;
-      if (typingTimer) {
-        clearInterval(typingTimer);
-        typingTimer = null;
-      }
-      activeAssistantMessage.value = null;
       // 流式结束，清除本地缓存
       messageCache.remove(sessionId);
     },
@@ -196,8 +248,6 @@ function subscribeToSession(sessionId, sessionCache) {
         typingTimer = null;
       }
       activeAssistantMessage.value = null;
-      // 出错时也清除本地缓存，避免脏数据
-      messageCache.remove(sessionId);
     },
   });
 
@@ -312,9 +362,7 @@ function handleInputEnter() {
 
 // 开始流式发送消息
 async function startStream(data) {
-  const prompt = (
-    typeof data === "string" ? data : userInput.value || ""
-  ).trim();
+  const prompt = data.trim();
   if (!prompt) return;
 
   isStreaming.value = true;
@@ -330,13 +378,13 @@ async function startStream(data) {
     senderType: "USER",
     content: prompt,
   });
-
   // 将 AI 消息添加到当前消息列表，并记录当前正在流式输出的消息对象
   currentMessages.value.push({
     senderType: "AI",
     content: "",
     stopped: false,
   });
+
   activeAssistantMessage.value =
     currentMessages.value[currentMessages.value.length - 1];
 
@@ -346,7 +394,7 @@ async function startStream(data) {
 
   let sid = props.chatId ?? 0;
   // 如果当前是本地临时会话（id=0），则先创建真实会话
-  if (sid == 0) {
+  if (sid === "0") {
     // 标记为正在提升会话
     isPromotingFromLocal.value = true;
 
@@ -373,9 +421,10 @@ async function startStream(data) {
       sessionId: sid,
       mode: mode.value ? ChatMode.Online : ChatMode.Local,
     });
-
+    // 清除本地缓存
+    messageCache.remove(sid);
     // 订阅sse
-    subscribeToSession(sid, null);
+    NewSSE(sid, null);
   } catch (err) {
     // startChat 或 subscribeChatStream 出错
     isStreaming.value = false;
@@ -389,10 +438,20 @@ async function startStream(data) {
 
 // 停止当前流式输出
 function stopStream() {
+  if (sessionSseHandle) closeSse();
   chatAPI
     .patchStopMessage(props.chatId)
-    .catch((err) => console.error("手动停止对话失败:", err));
+    .catch((err) => console.error("停止对话失败:", err));
   isStreaming.value = false;
+
+  // // TODO：如果缓冲区还有剩余内容，立即全部显示
+  // if (typingBuffer.value.length > 0 && activeAssistantMessage.value) {
+  //   const msg = activeAssistantMessage.value;
+  //   msg.content += typingBuffer.value;
+  //   typingBuffer.value = "";
+  //   nextTick(() => scrollToBottom());
+  // }
+
   typingBuffer.value = "";
   if (typingTimer) {
     clearInterval(typingTimer);
@@ -457,56 +516,78 @@ function handleMessagesScroll() {
   autoScrollEnabled.value = distanceToBottom <= thresholdBottom;
 }
 
+// 计算并保存当前流式缓存到本地
+function saveStreamCache() {
+  if (props.chatId && isStreaming.value) {
+    const fullContent =
+      activeAssistantMessage.value.content + typingBuffer.value;
+    messageCache.save(props.chatId, fullContent, lastReceivedChunkId);
+  }
+}
+
 // 关闭旧连接
 const closeSse = () => {
-  if (sessionSseHandle) {
-    sessionSseHandle.cancel();
-    sessionSseHandle = null;
-  }
+  sessionSseHandle.cancel();
+  sessionSseHandle = null;
 };
 // 组件挂载
 onMounted(() => {
+  // 从 localStorage 读取保存的模式
+  const savedMode = localStorage.getItem("chatMode");
+  if (savedMode !== null) {
+    mode.value = savedMode === "true"; // localStorage 存储的是字符串
+  }
+
+  // 监听浏览器刷新/关闭/跳转事件
+  window.addEventListener("beforeunload", () => saveStreamCache());
   // 监听滚动事件
   if (messagesRef.value) {
     messagesRef.value.addEventListener("scroll", handleMessagesScroll);
   }
 });
 
+// 监听 mode 变化，保存到 localStorage
+watch(mode, (newMode) => {
+  localStorage.setItem("chatMode", String(newMode));
+});
+
 // 监听：当组件接收到的值改变时，根据该值加载对应会话消息
 watch(
   () => props.chatId,
   async (newId, oldId) => {
-    // 关闭旧连接 + 保存旧会话缓存
-    closeSse();
-    if (oldId && isStreaming.value) {
+    // 离开
+    // 有sse => 关闭连接 + 保存旧会话缓存
+    if (sessionSseHandle) {
+      closeSse();
       // 完整内容 = 已渲染 + 打字机缓冲区
       const fullContent =
         activeAssistantMessage.value.content + typingBuffer.value;
       messageCache.save(oldId, fullContent, lastReceivedChunkId);
     }
-
-    // 清理状态
-    if (skeletonTimer) clearTimeout(skeletonTimer);
-    clearStreamingState();
-    resetChatView();
-
-    // 如果进入新对话窗口，return
-    if (newId === "0" || newId == null) return;
-
-    // 设置骨架屏 + 加载历史记录
-    skeletonTimer = setTimeout(() => {
-      showSkeleton.value = true;
-    }, 300);
-    await loadChat(newId);
-
-    // 加载完成，清除骨架屏
+    // 清理所有状态
+    isStreaming.value = false;
+    typingBuffer.value = "";
+    activeAssistantMessage.value = null;
+    lastReceivedChunkId = null;
+    currentMessages.value = [];
+    resetPagination();
+    showSkeleton.value = false;
     if (skeletonTimer) {
       clearTimeout(skeletonTimer);
       skeletonTimer = null;
     }
-    showSkeleton.value = false;
+    if (typingTimer) {
+      clearInterval(typingTimer);
+      typingTimer = null;
+    }
 
-    // 从本地缓存中读取：sessionId，lastReceivedChunkId
+    // 进入
+    // 如果进入新对话窗口，return
+    if (newId === "0" || newId == null) return;
+
+    await runWithSkeleton(loadChat(newId));
+
+    // 从本地缓存中读取：content，lastReceivedChunkId
     const sessionCache = messageCache.get(newId);
 
     // 建立当前会话的SSE连接，监听实时消息
@@ -517,12 +598,7 @@ watch(
 // 组件卸载前
 onBeforeUnmount(() => {
   // 卸载前保存当前流式缓存（TODO：刷新页面时保留状态）
-  if (props.chatId && isStreaming.value) {
-    // 完整内容 = 已渲染 + 打字机缓冲区
-    const fullContent =
-      activeAssistantMessage.value.content + typingBuffer.value;
-    messageCache.save(props.chatId, fullContent, lastReceivedChunkId);
-  }
+  saveStreamCache();
 
   // 移除滚动事件监听
   if (messagesRef.value) {
@@ -607,7 +683,11 @@ onBeforeUnmount(() => {
           <el-button
             round
             class="send-button"
-            @click="isStreaming ? stopStream() : startStream(userInput)"
+            @click="
+              isStreaming || typingBuffer.length
+                ? stopStream()
+                : startStream(userInput)
+            "
             :disabled="!isStreaming && !userInput.trim()"
           >
             <template v-if="isStreaming">
