@@ -115,9 +115,9 @@
 
       <!-- 主区域：通过路由渲染具体聊天内容 -->
       <el-main class="chat-main">
-        <router-view v-slot="{ Component }">
+        <router-view>
           <component
-            :is="Component || ChatRecord"
+            :is="ChatRecord"
             :chat-id="String(currentChatId)"
             @chat-created="handleChatCreated"
           />
@@ -562,7 +562,7 @@ onUnmounted(() => {
 
       // 限制消息内容宽度并居中
       > * {
-        max-width: 48rem; // 约 768px
+        max-width: 1000px;
         width: 100%;
         margin: 0 auto;
       }

@@ -67,7 +67,9 @@ export const chatAPI = {
 
   // 手动停止对话
   patchStopMessage(sessionId) {
-    return apiClient.patch(`${SESSIONS_API_BASE_URL}/${sessionId}`);
+    return apiClient.patch(
+      `${ASSISTANT_API_BASE_URL}${SESSIONS_API_BASE_URL}/${sessionId}`,
+    );
   },
 
   // 获取聊天历史列表
