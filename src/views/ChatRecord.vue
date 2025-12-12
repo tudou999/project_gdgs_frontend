@@ -597,7 +597,7 @@ watch(
 
 // 组件卸载前
 onBeforeUnmount(() => {
-  // 卸载前保存当前流式缓存（TODO：刷新页面时保留状态）
+  // 卸载前保存当前流式缓存
   saveStreamCache();
 
   // 移除滚动事件监听
@@ -719,8 +719,7 @@ onBeforeUnmount(() => {
   gap: 1.5rem;
 
   > * {
-    max-width: 900px;
-    width: 100%;
+    width: 70%;
     margin: 0 auto;
   }
 

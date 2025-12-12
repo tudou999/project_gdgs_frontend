@@ -432,7 +432,7 @@ const formatTime = (timestamp) => {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    max-width: 90%; // 增加最大宽度
+    max-width: 100%; // 增加最大宽度
 
     .text-container {
       position: relative;

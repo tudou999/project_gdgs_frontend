@@ -1,129 +1,126 @@
 <template>
-  <el-container class="ai-chat">
-    <el-container class="chat-container">
-      <!-- 侧边栏 -->
-      <el-aside class="sidebar">
-        <div class="aside-header">
-          <h2>聊天记录</h2>
-          <el-button size="large" @click="startNewChat" type="primary">
-            <el-icon>
-              <ChatDotSquare />
-            </el-icon>
-            新对话
-          </el-button>
-        </div>
-        <el-menu
-          class="history-menu"
-          :default-active="currentChatId !== null ? String(currentChatId) : ''"
-          @select="handleHistorySelect"
-        >
-          <!-- 骨架屏 -->
-          <template v-if="showSkeleton">
-            <div
-              v-for="i in 5"
-              :key="'skeleton-' + i"
-              class="history-item-skeleton"
-            >
-              <el-skeleton animated>
-                <template #template>
-                  <div class="skeleton-content">
-                    <el-skeleton-item variant="circle" class="skeleton-icon" />
-                    <el-skeleton-item variant="text" class="skeleton-title" />
-                  </div>
-                </template>
-              </el-skeleton>
-            </div>
-          </template>
-          <el-menu-item
-            v-else
-            v-for="chat in chatHistory"
-            :key="chat.id"
-            class="history-item"
-            :index="String(chat.id)"
-            :class="{
-              active: currentChatId === chat.id,
-              editing: chat.editing !== 0,
-            }"
+  <el-container class="chat-container">
+    <!-- 侧边栏 -->
+    <el-aside class="sidebar">
+      <div class="aside-header">
+        <h2>聊天记录</h2>
+        <el-button size="large" @click="startNewChat" type="primary">
+          <el-icon>
+            <ChatDotSquare />
+          </el-icon>
+          新对话
+        </el-button>
+      </div>
+      <el-menu
+        class="history-menu"
+        :default-active="currentChatId !== null ? String(currentChatId) : ''"
+        @select="handleHistorySelect"
+      >
+        <!-- 骨架屏 -->
+        <template v-if="showSkeleton">
+          <div
+            v-for="i in 5"
+            :key="'skeleton-' + i"
+            class="history-item-skeleton"
           >
-            <ChatBubbleLeftRightIcon class="icon" />
+            <el-skeleton animated>
+              <template #template>
+                <div class="skeleton-content">
+                  <el-skeleton-item variant="circle" class="skeleton-icon" />
+                  <el-skeleton-item variant="text" class="skeleton-title" />
+                </div>
+              </template>
+            </el-skeleton>
+          </div>
+        </template>
+        <el-menu-item
+          v-else
+          v-for="chat in chatHistory"
+          :key="chat.id"
+          class="history-item"
+          :index="String(chat.id)"
+          :class="{
+            active: currentChatId === chat.id,
+            editing: chat.editing !== 0,
+          }"
+        >
+          <ChatBubbleLeftRightIcon class="icon" />
 
-            <span v-if="chat.editing === 0" class="title">
-              {{ chat.title || "新对话" }}
-            </span>
+          <span v-if="chat.editing === 0" class="title">
+            {{ chat.title || "新对话" }}
+          </span>
 
-            <div v-else class="rename-editing" @click.stop>
-              <el-input
-                ref="refInput"
-                v-model="chat.title"
-                size="default"
-                placeholder="请输入新标题"
-                clearable
-                @keydown.enter.stop.prevent="confirmRename(chat)"
+          <div v-else class="rename-editing" @click.stop>
+            <el-input
+              ref="refInput"
+              v-model="chat.title"
+              size="default"
+              placeholder="请输入新标题"
+              clearable
+              @keydown.enter.stop.prevent="confirmRename(chat)"
+              :disabled="renamingId && renamingId !== chat.id"
+              class="rename-input"
+            />
+            <div class="rename-actions">
+              <el-button
+                style="padding: 5px 0"
+                type="primary"
+                size="small"
+                @click.stop="confirmRename(chat)"
+                :loading="renamingId === chat.id"
                 :disabled="renamingId && renamingId !== chat.id"
-                class="rename-input"
-              />
-              <div class="rename-actions">
-                <el-button
-                  style="padding: 5px 0"
-                  type="primary"
-                  size="small"
-                  @click.stop="confirmRename(chat)"
-                  :loading="renamingId === chat.id"
-                  :disabled="renamingId && renamingId !== chat.id"
-                >
-                  <el-icon style="margin: 0"><Check /></el-icon>
-                </el-button>
-                <el-button
-                  style="padding: 5px 0"
-                  size="small"
-                  @click.stop="cancelRename(chat)"
-                  :disabled="renamingId && renamingId !== chat.id"
-                >
-                  <el-icon style="margin: 0"><Close /></el-icon>
-                </el-button>
-              </div>
+              >
+                <el-icon style="margin: 0"><Check /></el-icon>
+              </el-button>
+              <el-button
+                style="padding: 5px 0"
+                size="small"
+                @click.stop="cancelRename(chat)"
+                :disabled="renamingId && renamingId !== chat.id"
+              >
+                <el-icon style="margin: 0"><Close /></el-icon>
+              </el-button>
             </div>
+          </div>
 
-            <span class="actions" @click.stop>
-              <el-dropdown size="large" trigger="click">
-                <el-button
-                  :disabled="isAnyEditing && chat.editing === 0"
-                  text
-                  style="padding: 0"
-                >
-                  <el-icon style="margin: 0">
-                    <More />
-                  </el-icon>
-                </el-button>
+          <span class="actions" @click.stop>
+            <el-dropdown size="large" trigger="click">
+              <el-button
+                :disabled="isAnyEditing && chat.editing === 0"
+                text
+                style="padding: 0"
+              >
+                <el-icon style="margin: 0">
+                  <More />
+                </el-icon>
+              </el-button>
 
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="renameSession(chat)"
-                      >重命名会话</el-dropdown-item
-                    >
-                    <el-dropdown-item
-                      @click="deleteSession(chat.id, chat.title)"
-                      >删除会话</el-dropdown-item
-                    >
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </span>
-          </el-menu-item>
-        </el-menu>
-      </el-aside>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="renameSession(chat)"
+                    >重命名会话</el-dropdown-item
+                  >
+                  <el-dropdown-item @click="deleteSession(chat.id, chat.title)"
+                    >删除会话</el-dropdown-item
+                  >
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </span>
+        </el-menu-item>
+      </el-menu>
+    </el-aside>
 
-      <!-- 主区域：通过路由渲染具体聊天内容 -->
-      <el-main class="chat-main">
-        <router-view>
-          <component
-            :is="ChatRecord"
-            :chat-id="String(currentChatId)"
-            @chat-created="handleChatCreated"
-          />
-        </router-view>
-      </el-main>
-    </el-container>
+    <!-- 主区域：通过路由渲染具体聊天内容 -->
+    <el-main class="chat-main">
+      <router-view>
+        <component
+          :is="ChatRecord"
+          :chat-id="String(currentChatId)"
+          @chat-created="handleChatCreated"
+        />
+      </router-view>
+    </el-main>
   </el-container>
 </template>
 
@@ -343,450 +340,387 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
-.ai-chat {
+.chat-container {
   position: fixed; // 修改为固定定位
   top: 64px; // 导航栏高度
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
   background: var(--el-bg-color);
   overflow: hidden; // 防止页面滚动
+  flex: 1;
+  width: 100%;
+  padding: 20px 20px 80px 20px;
+  gap: 15px;
+  height: 100%; // 确保容器占满高度
+}
 
-  .chat-container {
-    flex: 1;
+.sidebar {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg-color-overlay);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+
+  .aside-header {
+    flex-shrink: 0;
+    padding: 1rem;
     display: flex;
-    max-width: 1800px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 1.5rem 2rem;
-    gap: 1.5rem;
-    height: 100%; // 确保容器占满高度
-    overflow: hidden; // 防止容器滚动
+    justify-content: space-between;
+    align-items: center;
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
   }
 
-  .sidebar {
-    width: 280px;
-    display: flex;
-    flex-direction: column;
-    background: var(--el-bg-color-overlay);
-    backdrop-filter: blur(10px);
-    border-radius: 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  .history-menu {
+    flex: 1;
+    border-right: none;
+    background: transparent;
+    padding: 0 0.75rem 1rem;
+    overflow-y: auto;
 
-    .aside-header {
-      flex-shrink: 0;
-      padding: 1rem;
+    :deep(.el-menu-item) {
+      height: auto;
+      line-height: 1.4;
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      border-radius: 0.75rem;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-
-      h2 {
-        font-size: 1.1rem;
-        font-weight: 600;
-      }
-    }
-
-    .history-menu {
-      flex: 1;
-      border-right: none;
-      background: transparent;
-      padding: 0 0.75rem 1rem;
-      overflow-y: auto;
-
-      :deep(.el-menu-item) {
-        height: auto;
-        line-height: 1.4;
-        padding: 0.75rem;
-        margin-bottom: 0.5rem;
-        border-radius: 0.75rem;
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        transition: background-color 0.2s;
-
-        &.is-active,
-        &:hover {
-          background: color-mix(
-            in srgb,
-            var(--el-color-primary) 10%,
-            transparent
-          );
-        }
-
-        &.editing {
-          background: var(--el-fill-color-light);
-          .actions {
-            display: none;
-          }
-        }
-
-        .icon {
-          width: 1.25rem;
-          height: 1.25rem;
-          flex-shrink: 0;
-        }
-
-        .title {
-          flex: 1;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .rename-editing {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-
-          :deep(.el-input) {
-            flex: 1;
-            min-width: 0;
-          }
-
-          .rename-input {
-            flex: 1;
-            width: auto;
-            min-width: 50px;
-          }
-
-          .rename-confirm-btn,
-          .rename-cancel-btn {
-            flex-shrink: 0;
-          }
-
-          .rename-actions {
-            display: flex;
-            gap: 0;
-            flex-shrink: 0;
-          }
-        }
-      }
-
-      .history-item-skeleton {
-        padding: 0.75rem;
-        margin-bottom: 0.5rem;
-        border-radius: 0.75rem;
-        background: var(--el-fill-color-lighter);
-
-        .skeleton-content {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .skeleton-icon {
-          width: 1.25rem;
-          height: 1.25rem;
-          flex-shrink: 0;
-        }
-
-        .skeleton-title {
-          flex: 1;
-          height: 1rem;
-        }
-      }
-    }
-
-    .new-chat {
-      display: flex;
-      align-items: center;
       gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border-radius: 0.5rem;
-      background: var(--el-color-primary);
-      color: var(--el-color-white, #fff);
-      border: none;
-      cursor: pointer;
-      transition: background-color 0.3s;
+      align-items: center;
+      transition: background-color 0.2s;
 
+      &.is-active,
       &:hover {
-        background: var(--el-color-primary-dark-2);
+        background: color-mix(
+          in srgb,
+          var(--el-color-primary) 10%,
+          transparent
+        );
+      }
+
+      &.editing {
+        background: var(--el-fill-color-light);
+        .actions {
+          display: none;
+        }
       }
 
       .icon {
         width: 1.25rem;
         height: 1.25rem;
-        .actions {
-          margin-left: auto;
-          opacity: 0;
-          visibility: hidden;
-          transition: opacity 0.15s ease;
+        flex-shrink: 0;
+      }
+
+      .title {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .rename-editing {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+
+        :deep(.el-input) {
+          flex: 1;
+          min-width: 0;
         }
 
-        &:hover .actions {
-          opacity: 1;
-          visibility: visible;
+        .rename-input {
+          flex: 1;
+          width: auto;
+          min-width: 50px;
         }
+
+        .rename-confirm-btn,
+        .rename-cancel-btn {
+          flex-shrink: 0;
+        }
+
+        .rename-actions {
+          display: flex;
+          gap: 0;
+          flex-shrink: 0;
+        }
+      }
+    }
+
+    .history-item-skeleton {
+      padding: 0.75rem;
+      margin-bottom: 0.5rem;
+      border-radius: 0.75rem;
+      background: var(--el-fill-color-lighter);
+
+      .skeleton-content {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .skeleton-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+        flex-shrink: 0;
+      }
+
+      .skeleton-title {
+        flex: 1;
+        height: 1rem;
       }
     }
   }
 
-  .chat-main {
+  .new-chat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    background: var(--el-color-primary);
+    color: var(--el-color-white, #fff);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+
+    &:hover {
+      background: var(--el-color-primary-dark-2);
+    }
+
+    .icon {
+      width: 1.25rem;
+      height: 1.25rem;
+      .actions {
+        margin-left: auto;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.15s ease;
+      }
+
+      &:hover .actions {
+        opacity: 1;
+        visibility: visible;
+      }
+    }
+  }
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg-color-overlay);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  overflow: hidden; // 防止内容溢出
+
+  .messages {
     flex: 1;
+    overflow-y: auto;
+    padding: 1rem; // 减少 padding
     display: flex;
     flex-direction: column;
-    background: var(--el-bg-color-overlay);
-    backdrop-filter: blur(10px);
-    border-radius: 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    overflow: hidden; // 防止内容溢出
+    gap: 1.5rem; // 增加消息间距
 
-    .messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem; // 减少 padding
+    // 限制消息内容宽度并居中
+    > * {
+      max-width: 1000px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* 美化滚动条 */
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--el-border-color);
+      border-radius: 4px;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--el-border-color-dark);
+    }
+  }
+
+  .input-area {
+    flex-shrink: 0;
+    padding: 1rem;
+    background: transparent; // 背景透明
+    display: flex;
+    flex-direction: column;
+    align-items: center; // 居中
+
+    .input-wrapper {
+      width: 100%;
+      max-width: 48rem; // 限制宽度
+      margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem; // 增加消息间距
+      gap: 1rem;
+    }
 
-      // 限制消息内容宽度并居中
-      > * {
-        max-width: 1000px;
-        width: 100%;
-        margin: 0 auto;
-      }
+    .selected-files {
+      background: var(--el-bg-color);
+      border-radius: 0.75rem;
+      padding: 0.5rem;
+      border: 1px solid var(--el-border-color-light);
+      width: 100%;
 
-      /* 美化滚动条 */
-      &::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      &::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      &::-webkit-scrollbar-thumb {
-        background: var(--el-border-color);
-        border-radius: 4px;
-      }
-      &::-webkit-scrollbar-thumb:hover {
-        background: var(--el-border-color-dark);
+      .file-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: var(--el-bg-color);
+        border-radius: 0.5rem;
+        margin-bottom: 0.75rem;
+        border: 1px solid var(--el-border-color);
+        transition: all 0.2s ease;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+
+        &:hover {
+          background: color-mix(
+            in srgb,
+            var(--el-color-primary) 3%,
+            transparent
+          );
+          border-color: color-mix(
+            in srgb,
+            var(--el-color-primary) 20%,
+            var(--el-border-color)
+          );
+        }
+
+        .file-info {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+
+          .icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: var(--el-color-primary);
+          }
+
+          .file-name {
+            font-size: 0.875rem;
+            color: var(--el-text-color-primary);
+            font-weight: 500;
+          }
+
+          .file-size {
+            font-size: 0.75rem;
+            color: var(--el-text-color-secondary);
+            background: var(--el-fill-color-light);
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+          }
+        }
+
+        .remove-btn {
+          padding: 0.375rem;
+          border: none;
+          background: var(--el-fill-color-light);
+          color: var(--el-text-color-secondary);
+          cursor: pointer;
+          border-radius: 0.375rem;
+          transition: all 0.2s ease;
+
+          &:hover {
+            background: var(--el-color-danger);
+            color: var(--el-color-white, #fff);
+          }
+
+          .icon {
+            width: 1.25rem;
+            height: 1.25rem;
+          }
+        }
       }
     }
 
-    .input-area {
-      flex-shrink: 0;
-      padding: 1rem;
-      background: transparent; // 背景透明
+    .input-row {
       display: flex;
-      flex-direction: column;
-      align-items: center; // 居中
+      gap: 0.75rem;
+      align-items: flex-end; // 底部对齐
+      background: var(--el-bg-color);
+      padding: 0.75rem;
+      border-radius: 1.5rem; // 更大的圆角
+      border: 1px solid var(--el-border-color-light);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); // 悬浮感阴影
+      width: 100%;
+      transition:
+        border-color 0.2s,
+        box-shadow 0.2s;
 
-      .input-wrapper {
-        width: 100%;
-        max-width: 48rem; // 限制宽度
-        margin: 0 auto;
-        display: flex;
-        flex-direction: column;
-        gap: 1rem;
+      &:focus-within {
+        border-color: var(--el-border-color-darker);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      }
+      :deep(.el-input) {
+        flex: 1;
       }
 
-      .selected-files {
-        background: var(--el-bg-color);
-        border-radius: 0.75rem;
-        padding: 0.5rem;
-        border: 1px solid var(--el-border-color-light);
-        width: 100%;
-
-        .file-item {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0.75rem;
-          background: var(--el-bg-color);
-          border-radius: 0.5rem;
-          margin-bottom: 0.75rem;
-          border: 1px solid var(--el-border-color);
-          transition: all 0.2s ease;
-
-          &:last-child {
-            margin-bottom: 0;
-          }
-
-          &:hover {
-            background: color-mix(
-              in srgb,
-              var(--el-color-primary) 3%,
-              transparent
-            );
-            border-color: color-mix(
-              in srgb,
-              var(--el-color-primary) 20%,
-              var(--el-border-color)
-            );
-          }
-
-          .file-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-
-            .icon {
-              width: 1.5rem;
-              height: 1.5rem;
-              color: var(--el-color-primary);
-            }
-
-            .file-name {
-              font-size: 0.875rem;
-              color: var(--el-text-color-primary);
-              font-weight: 500;
-            }
-
-            .file-size {
-              font-size: 0.75rem;
-              color: var(--el-text-color-secondary);
-              background: var(--el-fill-color-light);
-              padding: 0.25rem 0.5rem;
-              border-radius: 1rem;
-            }
-          }
-
-          .remove-btn {
-            padding: 0.375rem;
-            border: none;
-            background: var(--el-fill-color-light);
-            color: var(--el-text-color-secondary);
-            cursor: pointer;
-            border-radius: 0.375rem;
-            transition: all 0.2s ease;
-
-            &:hover {
-              background: var(--el-color-danger);
-              color: var(--el-color-white, #fff);
-            }
-
-            .icon {
-              width: 1.25rem;
-              height: 1.25rem;
-            }
-          }
-        }
+      // 去掉 el-input 自己的边框和背景，只用外面的那块区域
+      :deep(.el-input__wrapper) {
+        background: transparent;
+        box-shadow: none;
+        border: none;
+        padding-left: 0;
+        padding-right: 0;
       }
 
-      .input-row {
-        display: flex;
-        gap: 0.75rem;
-        align-items: flex-end; // 底部对齐
-        background: var(--el-bg-color);
-        padding: 0.75rem;
-        border-radius: 1.5rem; // 更大的圆角
-        border: 1px solid var(--el-border-color-light);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); // 悬浮感阴影
-        width: 100%;
-        transition:
-          border-color 0.2s,
-          box-shadow 0.2s;
+      :deep(.el-input__inner) {
+        padding-left: 0;
+        padding-right: 0;
+      }
 
-        &:focus-within {
-          border-color: var(--el-border-color-darker);
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-        }
-        :deep(.el-input) {
-          flex: 1;
+      .file-upload {
+        .hidden {
+          display: none;
         }
 
-        // 去掉 el-input 自己的边框和背景，只用外面的那块区域
-        :deep(.el-input__wrapper) {
-          background: transparent;
-          box-shadow: none;
-          border: none;
-          padding-left: 0;
-          padding-right: 0;
-        }
-
-        :deep(.el-input__inner) {
-          padding-left: 0;
-          padding-right: 0;
-        }
-
-        .file-upload {
-          .hidden {
-            display: none;
-          }
-
-          .upload-btn {
-            width: 2.5rem;
-            height: 2.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: none;
-            border-radius: 0.75rem;
-            background: color-mix(
-              in srgb,
-              var(--el-color-primary) 12%,
-              transparent
-            );
-            color: var(--el-color-primary);
-            cursor: pointer;
-            transition: all 0.2s ease;
-
-            &:hover:not(:disabled) {
-              background: color-mix(
-                in srgb,
-                var(--el-color-primary) 20%,
-                transparent
-              );
-            }
-
-            &:disabled {
-              opacity: 0.5;
-              cursor: not-allowed;
-            }
-
-            .icon {
-              width: 1.25rem;
-              height: 1.25rem;
-            }
-          }
-        }
-
-        textarea {
-          flex: 1;
-          resize: none;
-          border: none;
-          background: transparent;
-          padding: 0.25rem 0.5rem; // 调整 padding
-          color: inherit;
-          font-family: inherit;
-          font-size: 1rem;
-          line-height: 1.5;
-          max-height: 200px; // 增加最大高度
-
-          &:focus {
-            outline: none;
-          }
-
-          &::placeholder {
-            color: var(--el-text-color-placeholder);
-          }
-        }
-
-        .send-button {
-          width: 2rem; // 稍微改小一点
-          height: 2rem;
+        .upload-btn {
+          width: 2.5rem;
+          height: 2.5rem;
           display: flex;
           align-items: center;
           justify-content: center;
           border: none;
-          border-radius: 0.5rem; // 圆角
-          background: var(--el-text-color-primary); // 黑色背景（亮色模式）
-          color: var(--el-bg-color);
+          border-radius: 0.75rem;
+          background: color-mix(
+            in srgb,
+            var(--el-color-primary) 12%,
+            transparent
+          );
+          color: var(--el-color-primary);
           cursor: pointer;
           transition: all 0.2s ease;
-          flex-shrink: 0;
-          margin-bottom: 0.25rem; // 对齐到底部
 
           &:hover:not(:disabled) {
-            background: var(--el-text-color-regular);
-            transform: none;
+            background: color-mix(
+              in srgb,
+              var(--el-color-primary) 20%,
+              transparent
+            );
           }
 
           &:disabled {
-            background: var(--el-fill-color);
-            color: var(--el-text-color-placeholder);
+            opacity: 0.5;
             cursor: not-allowed;
           }
 
@@ -794,6 +728,59 @@ onMounted(() => {
             width: 1.25rem;
             height: 1.25rem;
           }
+        }
+      }
+
+      textarea {
+        flex: 1;
+        resize: none;
+        border: none;
+        background: transparent;
+        padding: 0.25rem 0.5rem; // 调整 padding
+        color: inherit;
+        font-family: inherit;
+        font-size: 1rem;
+        line-height: 1.5;
+        max-height: 200px; // 增加最大高度
+
+        &:focus {
+          outline: none;
+        }
+
+        &::placeholder {
+          color: var(--el-text-color-placeholder);
+        }
+      }
+
+      .send-button {
+        width: 2rem; // 稍微改小一点
+        height: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 0.5rem; // 圆角
+        background: var(--el-text-color-primary); // 黑色背景（亮色模式）
+        color: var(--el-bg-color);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+        margin-bottom: 0.25rem; // 对齐到底部
+
+        &:hover:not(:disabled) {
+          background: var(--el-text-color-regular);
+          transform: none;
+        }
+
+        &:disabled {
+          background: var(--el-fill-color);
+          color: var(--el-text-color-placeholder);
+          cursor: not-allowed;
+        }
+
+        .icon {
+          width: 1.25rem;
+          height: 1.25rem;
         }
       }
     }
