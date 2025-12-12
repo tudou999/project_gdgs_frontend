@@ -31,16 +31,16 @@
   </el-container>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ElMessage } from "element-plus";
 import { UploadFilled } from "@element-plus/icons-vue";
 import { useRoute, useRouter } from "vue-router";
-import { fileAPI } from "../services/file";
+import { fileAPI } from "../services/file.ts";
 
 const route = useRoute();
 const router = useRouter();
 
-async function uploadFile(options) {
+const uploadFile = async (options) => {
   const { file, onSuccess, onError, onProgress } = options;
 
   const folderIdStr = route.query.folderId;
@@ -50,7 +50,7 @@ async function uploadFile(options) {
   formData.append("file", file);
 
   try {
-    const responseJson = await fileAPI.postUploadFile(
+    const res = await fileAPI.postUploadFile(
       lastFolderId,
       formData,
       (progressEvent) => {
@@ -62,15 +62,15 @@ async function uploadFile(options) {
         }
       },
     );
-    if (responseJson.data.code === 200) {
+    if (res.data.code === 200) {
       ElMessage.success("上传成功！");
       if (onSuccess) {
-        onSuccess(responseJson, file);
+        onSuccess(res, file);
       }
     } else {
-      ElMessage.error("上传失败：" + (responseJson.data.msg || "未知错误"));
+      ElMessage.error("上传失败：" + (res.data.msg || "未知错误"));
       if (onError) {
-        onError(new Error(responseJson.data.msg || "上传失败"));
+        onError(new Error(res.data.msg || "上传失败"));
       }
     }
   } catch (error) {
@@ -79,17 +79,17 @@ async function uploadFile(options) {
       onError(error);
     }
   }
-}
+};
 
 // 返回文件夹
-async function goBackToFileSystem() {
+const goBackToFileSystem = async () => {
   const id = route.query.folderId;
   const query = id ? { id } : {};
   await router.push({
     name: "FileSystem",
     query,
   });
-}
+};
 </script>
 
 <style scoped lang="scss">

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ElMessage } from "element-plus";
 import {
   ArrowRight,
@@ -8,75 +8,37 @@ import {
   Operation,
 } from "@element-plus/icons-vue";
 import { computed, nextTick, ref, watch } from "vue";
-import { fileAPI } from "../services/file";
+import { fileAPI } from "../services/file.ts";
 import { useRoute, useRouter } from "vue-router";
 import { filesize } from "filesize";
+import type {
+  FileUploadInfo,
+  FileShowType,
+  FolderTempInfoType,
+  FileRawInfoType,
+  editingType,
+  TrailItemType,
+} from "../interface/TfileSystem.ts";
+import type { AxiosProgressEvent } from "axios";
 
 defineOptions({ name: "FileController" });
 
 const route = useRoute();
 const router = useRouter();
 
-const fileList = ref([]);
-const breadcrumbTrail = ref([{ id: null, name: "全部文件" }]);
-const existingNew = ref(false);
+const breadcrumbTrail = ref<TrailItemType[]>([{ id: null, name: "全部文件" }]);
 // 处于重命名状态的文件 ID
-const renamingId = ref(null);
-// 当前正在被拖拽的文件 ID
-const draggingFileId = ref(null);
-// 当前拖拽悬停的文件夹 ID
-const hoverFolderId = ref(null);
-// 下拉菜单实例的 Map，用于控制关闭时机
-const dropdownRefs = ref(new Map());
+const renamingId = ref<string>("");
+
 // 面包屑名称缓存：ID -> Name
 const folderCache = new Map();
 
-// 文件信息弹窗相关
-// 是否显示文件信息对话框
-const infoDialogVisible = ref(false);
-// 当前查看的文件信息
-const fileInfo = ref({});
-
-// 上传文件信息弹窗相关
-// 是否显示上传文件信息对话框
-const uploadInfoDialogVisible = ref(false);
-// 当前上传文件的 ID
-const currentFileId = ref(null);
-
-// 移动文件弹窗相关
-// 是否显示移动文件对话框
-const moveDialogVisible = ref(false);
-// 要移动的文件对象
-const moveSourceFile = ref(null);
-// 目标文件夹 ID
-const moveTargetFolderId = ref(null);
-
-const isDownloading = ref(false);
-const downloadPercent = ref(0);
-const downloadingFileName = ref("");
-const uploadInfoForm = ref({
-  projectName: "",
-  projectStartDate: "",
-  projectDuration: null,
-  projectManager: "",
-  projectManagerSecond: "",
-  projectLocation: "",
-  projectPartner: "",
-});
-
 // 格式化日期
-const formatDate = (dateString) => {
+const formatDate = (dateString: Date) => {
   if (!dateString) return "-";
   const date = new Date(dateString);
   return date.toLocaleString("zh-CN");
 };
-
-// 是否有文件处于编辑状态
-const isAnyEditing = computed(
-  () =>
-    Array.isArray(fileList.value) &&
-    fileList.value.some((f) => f.editing !== 0),
-);
 
 // 当前路径的 ID 数组（从根到当前文件夹）
 const currentPathIds = computed(() => {
@@ -105,11 +67,11 @@ watch(
 );
 
 // 加载面包屑和文件列表
-async function loadContent() {
+const loadContent = async () => {
   try {
     await reloadContent();
 
-    const trail = [{ id: null, name: "全部文件" }];
+    const trail: TrailItemType[] = [{ id: null, name: "全部文件" }];
 
     // 1. 过滤出缓存中不存在的 ID
     const missingIds = currentPathIds.value.filter(
@@ -122,13 +84,13 @@ async function loadContent() {
       const responses = await Promise.all(promises);
 
       for (let i = 0; i < responses.length; i++) {
-        const responseJson = responses[i];
+        const res = responses[i];
         const id = missingIds[i];
-        if (responseJson.code === 200) {
+        if (res.code === 200) {
           // 写入缓存
-          folderCache.set(id, responseJson.data.name);
+          folderCache.set(id, res.data.name);
         } else {
-          ElMessage.error("加载失败：", responseJson.msg);
+          ElMessage.error("加载失败：" + res.msg);
           await router.replace({ path: "/file" });
           return;
         }
@@ -147,135 +109,111 @@ async function loadContent() {
     console.error("加载失败:", error);
     ElMessage.warning("加载失败！请联系管理员");
   }
-}
+};
 
 // 点击文件夹时
-async function pushId(id) {
-  if (id == null) {
-    await router.push({ path: "/file" });
-  } else {
-    const newPath = [...currentPathIds.value, id];
-    await router.push({ path: "/file", query: { id: newPath.join(",") } });
-  }
-}
+const pushId = async (id: string) => {
+  const newPath = [...currentPathIds.value, id];
+  await router.push({ path: "/file", query: { id: newPath.join(",") } });
+};
 
 // 点击面包屑时
-async function navigateToTrail(index) {
-  if (index === 0) {
-    await router.push({ path: "/file" });
-  } else {
-    // 取前 index 个 ID（因为 breadcrumbTrail[0] 是根，对应空路径）
-    const targetPath = currentPathIds.value.slice(0, index);
-    const idStr = targetPath.length ? targetPath.join(",") : undefined;
-    await router.push({
-      path: "/file",
-      query: idStr ? { id: idStr } : {},
-    });
-  }
-}
+const navigateToTrail = async (index: number) => {
+  // 取前 index 个 ID（因为 breadcrumbTrail[0] 是根，对应空路径）
+  const targetPath = currentPathIds.value.slice(0, index);
+  const idStr = targetPath.length ? targetPath.join(",") : undefined;
+  await router.push({
+    path: "/file",
+    query: idStr ? { id: idStr } : {},
+  });
+};
 
+// 当前文件列表
+const fileList = ref<(FileRawInfoType | FolderTempInfoType)[]>([]);
+// 是否有文件处于编辑状态
+const isAnyEditing = computed(
+  () =>
+    Array.isArray(fileList.value) &&
+    fileList.value.some((f) => f.editing !== 0),
+);
+// 是否已有新建文件夹未保存
+const existingNew = ref<boolean>(false);
 // 点击新建文件夹按钮
-async function clickCreateFolder() {
+const clickCreateFolder = async (): Promise<void> => {
   if (existingNew.value) {
     ElMessage.warning("请先保存或取消新建文件夹");
     return;
   }
   const parentId = currentFolderId.value;
-  const defaultName = "新建文件夹";
 
-  const responseJson = await fileAPI.getFolderList(parentId);
-  if (responseJson.code === 200) {
-    const currentFiles = responseJson.data;
-    const existingNames = new Set(
-      currentFiles
-        .filter((item) => item.folder === true)
-        .map((item) => item.name),
-    );
+  const existingNames = new Set(
+    fileList.value
+      .filter((item) => item.folder === true)
+      .map((item) => item.name),
+  );
 
-    let newName = defaultName;
-    let counter = 1;
+  let newName = "新建文件夹";
+  for (let counter = 1; existingNames.has(newName); counter++) {
+    newName = `新建文件夹(${counter + 1})`;
+  }
 
-    while (existingNames.has(newName)) {
-      counter++;
-      newName = `${defaultName}(${counter})`;
-    }
+  // 生成唯一的临时 ID 用于聚焦
+  const tempId = `temp-${Date.now()}`;
+  const tempInfo: FolderTempInfoType = {
+    id: tempId,
+    name: newName,
+    parentId: parentId,
+    folder: true,
+    editing: 1,
+  };
 
-    // 生成唯一的临时 ID 用于聚焦
-    const tempId = `temp-${Date.now()}`;
-    const tempInfo = {
-      id: tempId,
-      parentId: parentId,
-      name: newName,
-      folder: true,
-      editing: 1,
-    };
+  fileList.value = [tempInfo, ...fileList.value];
 
-    fileList.value = [tempInfo, ...fileList.value];
-
-    // 等待 DOM 更新后聚焦输入框
-    await nextTick();
-    // 查找第一个新建文件夹输入框（新建的文件夹总是放在列表第一位）
-    // 更精确地查找：第一个 .file-item 下的 .createFolder-input
-    const firstFileItem = document.querySelector(".file-item");
-    if (firstFileItem) {
-      const inputWrapper = firstFileItem.querySelector(".createFolder-input");
-      if (inputWrapper) {
-        // Element Plus 的 el-input 内部会有一个 input 元素
-        const inputEl = inputWrapper.querySelector("input");
-        if (inputEl) {
-          inputEl.focus();
-        }
+  // 等待 DOM 更新后聚焦输入框
+  await nextTick();
+  // 查找第一个新建文件夹输入框（新建的文件夹总是放在列表第一位）
+  // 更精确地查找：第一个 .file-item 下的 .createFolder-input
+  const firstFileItem = document.querySelector(".file-item");
+  if (firstFileItem) {
+    const inputWrapper = firstFileItem.querySelector(".createFolder-input");
+    if (inputWrapper) {
+      // Element Plus 的 el-input 内部会有一个 input 元素
+      const inputEl = inputWrapper.querySelector("input");
+      if (inputEl) {
+        inputEl.focus();
       }
     }
-    existingNew.value = true;
-  } else {
-    ElMessage.error("加载失败：", responseJson.msg);
   }
-}
-
-// 创建文件夹
-async function createFolder(parentId, newName) {
-  try {
-    const responseJson = await fileAPI.postCreateFolder(parentId, newName);
-    if (responseJson.code === 200) {
-      await reloadContent();
-      ElMessage.success("创建成功！");
-    } else {
-      ElMessage.error("创建失败：", responseJson.msg);
-    }
-  } catch (error) {
-    console.error("创建文件夹失败:", error);
-    ElMessage.warning("创建文件夹失败！请联系管理员");
-  }
-}
+  existingNew.value = true;
+};
 
 // 重新加载目录，取消新建文件夹
-async function reloadContent() {
+const reloadContent = async () => {
   try {
-    const responseJson = await fileAPI.getFolderList(currentFolderId.value);
-    if (responseJson.code === 200) {
-      fileList.value = responseJson.data
-        .map((item) => ({
+    const res = await fileAPI.getFolderList(currentFolderId.value);
+    if (res.code === 200) {
+      fileList.value = res.data
+        .map((item: FileRawInfoType) => ({
           ...item,
           editing: 0,
         }))
-        .sort((a, b) => {
+        .sort((a: FileRawInfoType, b: FileRawInfoType) => {
           if (a.folder && !b.folder) return -1;
           if (!a.folder && b.folder) return 1;
           return a.name.localeCompare(b.name, "zh-CN");
         });
       existingNew.value = false;
     } else {
-      ElMessage.error("加载失败：", responseJson.msg);
+      ElMessage.error("加载失败：" + res.msg);
     }
   } catch (error) {
     console.error("加载失败:", error);
     ElMessage.warning("加载失败！请联系管理员");
   }
-}
+};
 
 // 点击重命名文件按钮
-async function clickRenameButton(file) {
+const clickRenameButton = async (file: FileRawInfoType) => {
   // 清空其他项的编辑态
   if (Array.isArray(fileList.value)) {
     fileList.value.forEach((f) => {
@@ -285,139 +223,169 @@ async function clickRenameButton(file) {
 
   file.editing = 2;
   await nextTick();
-  const inputEl = document.querySelector(".file-item .name-input input");
+  const inputEl: HTMLInputElement | null = document.querySelector(
+    ".file-item .name-input input",
+  );
   if (inputEl) {
     inputEl.focus();
   }
-}
+};
 
+// 是否显示文件信息对话框
+const infoDialogVisible = ref<boolean>(false);
+// 当前查看的文件信息
+const fileInfo = ref<FileShowType | null>(null);
 // 点击查看文件信息按钮
-async function clickInfoButton(file) {
+const clickInfoButton = async (id: string) => {
   try {
-    const responseJson = await fileAPI.getInformation(file.id);
-    if (responseJson.code === 200) {
-      fileInfo.value = responseJson.data;
+    const res = await fileAPI.getInformation(id);
+    if (res.code === 200) {
+      fileInfo.value = res.data;
       infoDialogVisible.value = true;
     } else {
-      ElMessage.error("获取信息失败：" + responseJson.msg);
+      ElMessage.error("获取信息失败：" + res.msg);
     }
   } catch (error) {
     console.error("获取信息失败:", error);
     ElMessage.warning("获取信息失败！请联系管理员");
   }
-}
+};
 
-/* 上传文件信息操作 */
+// 上传文件信息表单数据
+const uploadInfoForm = ref<FileUploadInfo | null>(null);
+// 是否显示上传文件信息对话框
+const uploadInfoDialogVisible = ref<boolean>(false);
+// 当前上传文件的 ID
+const currentFileId = ref<string>("");
 // 打开上传文件信息弹窗
-function openUploadInfoDialog(file) {
-  currentFileId.value = file.id;
+const openUploadInfoDialog = (id: string): void => {
+  currentFileId.value = id;
   // 重置表单
   uploadInfoForm.value = {
     projectName: "",
-    projectStartDate: "",
-    projectDuration: null,
+    projectStartDate: null,
+    projectDuration: 0,
     projectManager: "",
     projectManagerSecond: "",
-    projectLocation: "",
+    projectCity: "",
     projectPartner: "",
   };
   uploadInfoDialogVisible.value = true;
-}
-
+};
 // 提交上传文件信息
-async function submitUploadInfo() {
-  if (!uploadInfoForm.value.projectName) {
+const submitUploadInfo = async (): Promise<void> => {
+  if (!uploadInfoForm.value!.projectName) {
     ElMessage.warning("请输入项目名称");
     return;
   }
 
   try {
-    const responseJson = await fileAPI.postUploadFileInfo(
+    const res = await fileAPI.postUploadFileInfo(
       currentFileId.value,
-      uploadInfoForm.value,
+      uploadInfoForm.value!,
     );
-    if (responseJson.code === 200) {
+    if (res.code === 200) {
       ElMessage.success("文件信息上传成功！");
       uploadInfoDialogVisible.value = false;
     } else {
-      ElMessage.error("上传失败：" + (responseJson.msg || "未知错误"));
+      ElMessage.error("上传失败：" + (res.msg || "未知错误"));
     }
   } catch (error) {
     console.error("上传文件信息失败:", error);
     ElMessage.warning("上传失败！请联系管理员");
   }
-}
+};
 
-// 判断打钩执行的是新建还是重命名
-async function checkOrRename(editing, fatherId, checkedId, name) {
-  // editing: 1 新建文件夹 2 重命名文件
-  if (editing === 1) {
-    const responseJson = await createFolder(fatherId, name);
-    if (responseJson.code === 200) {
+// 创建文件夹
+const createFolder = async (
+  parentId: string | null,
+  newName: string,
+): Promise<void> => {
+  try {
+    const res = await fileAPI.postCreateFolder(parentId, newName);
+    if (res.code === 200) {
       await reloadContent();
       ElMessage.success("创建成功！");
     } else {
-      ElMessage.error("创建失败：", responseJson.msg);
+      ElMessage.error("创建失败：" + res.msg);
     }
-  } else if (editing === 2) {
-    if (renamingId.value) return;
-    renamingId.value = checkedId;
-    const responseJson = await fileAPI.putRenameFile(checkedId, name);
-    try {
-      if (responseJson.code === 200) {
-        // 更新缓存中的名称
-        folderCache.set(checkedId, name);
-        await reloadContent();
-        ElMessage.success("重命名成功！");
-      } else {
-        ElMessage.error("重命名失败：", responseJson.msg);
-      }
-    } finally {
-      renamingId.value = null;
-    }
+  } catch (error) {
+    console.error("创建文件夹失败:", error);
+    ElMessage.warning("创建文件夹失败！请联系管理员");
   }
-}
+};
+
+// 重命名文件夹
+const renameFF = async (myId: string, newName: string): Promise<void> => {
+  if (renamingId.value) return;
+  renamingId.value = myId;
+  try {
+    const res = await fileAPI.putRenameFile(myId, newName);
+    if (res.code === 200) {
+      // 更新缓存中的名称
+      folderCache.set(myId, newName);
+      await reloadContent();
+      ElMessage.success("重命名成功！");
+    } else {
+      ElMessage.error("重命名失败：" + res.msg);
+    }
+  } finally {
+    renamingId.value = "";
+  }
+};
+
+// 判断打钩执行的是新建还是重命名
+const checkOrRename = async (
+  editing: editingType,
+  fatherId: string | null,
+  myId: string,
+  newName: string,
+): Promise<void> => {
+  if (editing === 1) await createFolder(fatherId, newName);
+  else if (editing === 2) await renameFF(myId, newName);
+};
 
 // 删除文件
-async function deleteFile(id) {
+const deleteFile = async (id: string) => {
   try {
-    const responseJson = await fileAPI.deleteDeleteFile(id);
-    if (responseJson.code === 200) {
+    const res = await fileAPI.deleteDeleteFile(id);
+    if (res.code === 200) {
       await reloadContent();
       ElMessage.success("删除成功！");
     } else {
-      ElMessage.error("删除失败：", responseJson.msg);
+      ElMessage.error("删除失败：" + res.msg);
     }
   } catch (error) {
     console.error("删除失败:", error);
     ElMessage.warning("删除失败！请联系管理员");
   }
-}
+};
 
-/* 移动文件操作 */
+// 要移动的文件对象
+const moveSourceFile = ref<FileRawInfoType | null>(null);
+// 目标文件夹 ID
+const moveTargetFolderId = ref<string>("");
+// 是否显示移动文件对话框
+const moveDialogVisible = ref(false);
+
 // 打开移动文件对话框
-function openMoveDialog(file) {
+const openMoveDialog = (file: FileRawInfoType): void => {
   if (!file || file.folder) return;
   moveSourceFile.value = file;
-  moveTargetFolderId.value = null;
+  moveTargetFolderId.value = "";
   moveDialogVisible.value = true;
-}
-
+};
 // 选择移动目标文件夹
-function onMoveFolderNodeClick(data) {
-  if (data && data.id != null) {
-    moveTargetFolderId.value = data.id;
-  }
-}
-
+const onMoveFolderNodeClick = (data: FileRawInfoType) => {
+  if (data && data.id) moveTargetFolderId.value = data.id;
+};
 // 加载文件夹树
-async function loadFolderTree(node, resolve) {
+const loadFolderTree = async (node: any, resolve: any): Promise<void> => {
   try {
-    const parentId = node.level === 0 ? null : node.data.id;
-    const responseJson = await fileAPI.getFolderList(parentId);
-    if (responseJson.code === 200) {
-      const folders = Array.isArray(responseJson.data)
-        ? responseJson.data.filter((item) => item.folder === true)
+    const res = await fileAPI.getFolderList(null);
+    if (res.code === 200) {
+      const folders = Array.isArray(res.data)
+        ? res.data.filter((item) => item.folder === true)
         : [];
       const children = folders.map((item) => ({
         id: item.id,
@@ -426,7 +394,7 @@ async function loadFolderTree(node, resolve) {
       }));
       resolve(children);
     } else {
-      ElMessage.error("加载文件夹失败：" + (responseJson.msg || "未知错误"));
+      ElMessage.error("加载文件夹失败：" + (res.msg || "未知错误"));
       resolve([]);
     }
   } catch (error) {
@@ -434,101 +402,110 @@ async function loadFolderTree(node, resolve) {
     ElMessage.warning("加载文件夹失败！请联系管理员");
     resolve([]);
   }
-}
+};
 
 // 确认移动文件
-async function confirmMove() {
+const confirmMove = async () => {
   if (!moveSourceFile.value || moveTargetFolderId.value == null) {
     ElMessage.warning("请选择要移动到的文件夹");
     return;
   }
 
   try {
-    const responseJson = await fileAPI.putMoveFile(
+    const res = await fileAPI.putMoveFile(
       moveSourceFile.value.id,
       moveTargetFolderId.value,
     );
-    if (responseJson.code === 200) {
+    if (res.code === 200) {
       ElMessage.success("移动成功！");
       moveDialogVisible.value = false;
       moveSourceFile.value = null;
-      moveTargetFolderId.value = null;
+      moveTargetFolderId.value = "";
       await reloadContent();
     } else {
-      ElMessage.error("移动失败：" + (responseJson.msg || "未知错误"));
+      ElMessage.error("移动失败：" + (res.msg || "未知错误"));
     }
   } catch (error) {
     console.error("移动文件失败:", error);
     ElMessage.warning("移动失败！请联系管理员");
   }
-}
+};
 
-/* 拖拽文件操作 */
+// 当前正在被拖拽的文件 ID
+const draggingFileId = ref<string>("");
+// 当前拖拽悬停的文件夹 ID
+const hoverFolderId = ref<string>("");
 // 拖拽开始：记录被拖动的文件 ID
-function onFileDragStart(file) {
+const onFileDragStart = (file: FileRawInfoType) => {
   if (file && !file.folder) {
     draggingFileId.value = file.id;
   } else {
-    draggingFileId.value = null;
+    draggingFileId.value = "";
   }
-}
+};
 
 // 拖拽经过文件夹（主要用于配合 .prevent）
-function onFolderDragOver() {}
+const onFolderDragOver = () => {};
 
 // 拖拽进入文件夹：设置高亮
-function onFolderDragEnter(targetFolder) {
+const onFolderDragEnter = (targetFolder: FileRawInfoType) => {
   if (targetFolder && targetFolder.folder) {
     hoverFolderId.value = targetFolder.id;
   }
-}
+};
 
 // 拖拽离开文件夹：取消高亮
-function onFolderDragLeave(targetFolder) {
+const onFolderDragLeave = (targetFolder: FileRawInfoType) => {
   if (hoverFolderId.value === targetFolder.id) {
-    hoverFolderId.value = null;
+    hoverFolderId.value = "";
   }
-}
+};
 
 // 在文件夹上放下文件：调用移动接口
-async function onFolderDrop(targetFolder) {
+const onFolderDrop = async (targetFolder: FileRawInfoType) => {
   if (!draggingFileId.value) return;
   if (!targetFolder || !targetFolder.folder) return;
 
   const fileId = draggingFileId.value;
-  draggingFileId.value = null;
+  draggingFileId.value = "";
   if (hoverFolderId.value === targetFolder.id) {
-    hoverFolderId.value = null;
+    hoverFolderId.value = "";
   }
 
   try {
-    const responseJson = await fileAPI.putMoveFile(fileId, targetFolder.id);
-    if (responseJson.code === 200) {
+    const res = await fileAPI.putMoveFile(fileId, targetFolder.id);
+    if (res.code === 200) {
       await reloadContent();
       ElMessage.success("移动成功！");
     } else {
-      ElMessage.error("移动失败：" + (responseJson.msg || "未知错误"));
+      ElMessage.error("移动失败：" + (res.msg || "未知错误"));
     }
   } catch (error) {
     console.error("移动文件失败:", error);
     ElMessage.warning("移动失败！请联系管理员");
   }
-}
+};
 
+// 是否正在下载文件
+const isDownloading = ref<boolean>(false);
+// 下载进度百分比
+const downloadPercent = ref<number>(0);
+// 正在下载的文件名
+const downloadingFileName = ref<string>("");
 // 下载文件
-async function downloadFile(id, name) {
+const downloadFile = async (id: string, name: string) => {
   isDownloading.value = true;
   downloadPercent.value = 0;
   downloadingFileName.value = name || "";
   ElMessage.success("开始下载！");
-  const response = await fileAPI.getDownloadFile(id, (event) => {
+  const res = await fileAPI.getDownloadFile(id, (event: AxiosProgressEvent) => {
     if (!event.total) return;
     downloadPercent.value = Number(
       ((event.loaded / event.total) * 100).toFixed(2),
     );
   });
-  const contentDisposition = response.headers.get("Content-Disposition");
-  const fileUrl = URL.createObjectURL(response.data);
+  const contentDisposition = res.headers.get("Content-Disposition");
+  const fileUrl = URL.createObjectURL(res.data);
 
   // 提取文件名，兼容 filename= 和 filename*=，并处理 + 号为空格的问题
   let filename = "downloaded-file";
@@ -551,22 +528,22 @@ async function downloadFile(id, name) {
 
   URL.revokeObjectURL(fileUrl);
   isDownloading.value = false;
-}
+};
 
 // 计算文件大小
-function calculateFileSize(size) {
+const calculateFileSize = (size: string): string => {
   return filesize(size, { standard: "jedec" });
-}
+};
 
 // 前往上传界面
-function gotoUpload() {
+const gotoUpload = () => {
   router.push({
     name: "Upload",
     query: {
       folderId: route.query.id,
     },
   });
-}
+};
 </script>
 
 <template>
@@ -633,7 +610,7 @@ function gotoUpload() {
           <el-button
             type="primary"
             @click="
-              checkOrRename(file.editing, currentFolderId, file.id, file.name)
+              checkOrRename(file.editing!, currentFolderId, file.id, file.name)
             "
             size="small"
             :loading="renamingId === file.id"
@@ -657,7 +634,7 @@ function gotoUpload() {
             @click="pushId(file.id)"
             @keydown.enter="pushId(file.id)"
             @keydown.space.prevent="pushId(file.id)"
-            @dragover.prevent="onFolderDragOver($event)"
+            @dragover.prevent="onFolderDragOver"
             @dragenter.prevent="onFolderDragEnter(file)"
             @dragleave.prevent="onFolderDragLeave(file)"
             @drop="onFolderDrop(file)"
@@ -714,7 +691,7 @@ function gotoUpload() {
                   </el-popconfirm>
                 </el-dropdown-item>
                 <el-dropdown-item
-                  @click="clickInfoButton(file)"
+                  @click="clickInfoButton(file.id)"
                   v-if="!file.folder"
                   >查看文件信息</el-dropdown-item
                 >
@@ -724,7 +701,7 @@ function gotoUpload() {
                   >移动</el-dropdown-item
                 >
                 <el-dropdown-item
-                  @click="openUploadInfoDialog(file)"
+                  @click="openUploadInfoDialog(file.id)"
                   v-if="!file.folder"
                   >上传文件信息</el-dropdown-item
                 >
@@ -742,11 +719,11 @@ function gotoUpload() {
       >
         <el-form :model="uploadInfoForm" label-width="120px">
           <el-form-item required label="项目名称">
-            <el-input v-model="uploadInfoForm.projectName" />
+            <el-input v-model="uploadInfoForm!.projectName" />
           </el-form-item>
           <el-form-item label="项目创建日期">
             <el-date-picker
-              v-model="uploadInfoForm.projectStartDate"
+              v-model="uploadInfoForm!.projectStartDate"
               type="date"
               placeholder="选择日期"
               format="YYYY-MM-DD"
@@ -755,21 +732,21 @@ function gotoUpload() {
           </el-form-item>
           <el-form-item label="项目工期(天)">
             <el-input-number
-              v-model="uploadInfoForm.projectDuration"
+              v-model="uploadInfoForm!.projectDuration"
               :min="0"
             />
           </el-form-item>
           <el-form-item label="项目负责人">
-            <el-input v-model="uploadInfoForm.projectManager" />
+            <el-input v-model="uploadInfoForm!.projectManager" />
           </el-form-item>
           <el-form-item label="项目第二负责人">
-            <el-input v-model="uploadInfoForm.projectManagerSecond" />
+            <el-input v-model="uploadInfoForm!.projectManagerSecond" />
           </el-form-item>
           <el-form-item label="项目实施位置">
-            <el-input v-model="uploadInfoForm.projectLocation" />
+            <el-input v-model="uploadInfoForm!.projectCity" />
           </el-form-item>
           <el-form-item label="项目乙方单位">
-            <el-input v-model="uploadInfoForm.projectPartner" />
+            <el-input v-model="uploadInfoForm!.projectPartner" />
           </el-form-item>
         </el-form>
         <template #footer>
@@ -786,33 +763,35 @@ function gotoUpload() {
       <el-dialog v-model="infoDialogVisible" title="文件详情" width="500px">
         <el-form :model="fileInfo" label-width="120px">
           <el-form-item label="所属项目名称">
-            <span>{{ fileInfo.projectName || "-" }}</span>
+            <span>{{ fileInfo!.projectName || "-" }}</span>
           </el-form-item>
           <el-form-item label="项目创建日期">
-            <span>{{ fileInfo.projectStartDate || "-" }}</span>
+            <span>{{ fileInfo!.projectStartDate || "-" }}</span>
           </el-form-item>
           <el-form-item label="项目工期">
             <span>{{
-              fileInfo.projectDuration ? fileInfo.projectDuration + " 天" : "-"
+              fileInfo!.projectDuration
+                ? fileInfo!.projectDuration + " 天"
+                : "-"
             }}</span>
           </el-form-item>
           <el-form-item label="项目负责人">
-            <span>{{ fileInfo.projectManager || "-" }}</span>
+            <span>{{ fileInfo!.projectManager || "-" }}</span>
           </el-form-item>
           <el-form-item label="项目第二负责人">
-            <span>{{ fileInfo.projectManagerSecond || "-" }}</span>
+            <span>{{ fileInfo!.projectManagerSecond || "-" }}</span>
           </el-form-item>
           <el-form-item label="项目实施位置">
-            <span>{{ fileInfo.projectCity || "-" }}</span>
+            <span>{{ fileInfo!.projectCity || "-" }}</span>
           </el-form-item>
           <el-form-item label="项目乙方单位">
-            <span>{{ fileInfo.projectPartner || "-" }}</span>
+            <span>{{ fileInfo!.projectPartner || "-" }}</span>
           </el-form-item>
           <el-form-item label="创建时间">
-            <span>{{ formatDate(fileInfo.created) }}</span>
+            <span>{{ formatDate(fileInfo!.created) }}</span>
           </el-form-item>
           <el-form-item label="更新时间">
-            <span>{{ formatDate(fileInfo.updated) }}</span>
+            <span>{{ formatDate(fileInfo!.updated) }}</span>
           </el-form-item>
         </el-form>
       </el-dialog>
