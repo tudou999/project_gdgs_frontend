@@ -59,12 +59,30 @@ const currentFolderId = computed(() => {
     : null;
 });
 
-// 监听路由变化（包括前进/后退/初始加载）
-watch(
-  () => route.query.id,
-  () => loadContent(),
-  { immediate: true },
-);
+// 重新加载目录，取消新建文件夹
+const reloadContent = async () => {
+  try {
+    const res = await fileAPI.getFolderList(currentFolderId.value);
+    if (res.code === 200) {
+      fileList.value = res.data
+        .map((item: FileRawInfoType) => ({
+          ...item,
+          editing: 0,
+        }))
+        .sort((a: FileRawInfoType, b: FileRawInfoType) => {
+          if (a.folder && !b.folder) return -1;
+          if (!a.folder && b.folder) return 1;
+          return a.name.localeCompare(b.name, "zh-CN");
+        });
+      existingNew.value = false;
+    } else {
+      ElMessage.error("加载失败：" + res.msg);
+    }
+  } catch (error) {
+    console.error("加载失败:", error);
+    ElMessage.warning("加载失败！请联系管理员");
+  }
+};
 
 // 加载面包屑和文件列表
 const loadContent = async () => {
@@ -110,6 +128,13 @@ const loadContent = async () => {
     ElMessage.warning("加载失败！请联系管理员");
   }
 };
+
+// 监听路由变化（包括前进/后退/初始加载）
+watch(
+  () => route.query.id,
+  () => loadContent(),
+  { immediate: true },
+);
 
 // 点击文件夹时
 const pushId = async (id: string) => {
@@ -185,31 +210,6 @@ const clickCreateFolder = async (): Promise<void> => {
     }
   }
   existingNew.value = true;
-};
-
-// 重新加载目录，取消新建文件夹
-const reloadContent = async () => {
-  try {
-    const res = await fileAPI.getFolderList(currentFolderId.value);
-    if (res.code === 200) {
-      fileList.value = res.data
-        .map((item: FileRawInfoType) => ({
-          ...item,
-          editing: 0,
-        }))
-        .sort((a: FileRawInfoType, b: FileRawInfoType) => {
-          if (a.folder && !b.folder) return -1;
-          if (!a.folder && b.folder) return 1;
-          return a.name.localeCompare(b.name, "zh-CN");
-        });
-      existingNew.value = false;
-    } else {
-      ElMessage.error("加载失败：" + res.msg);
-    }
-  } catch (error) {
-    console.error("加载失败:", error);
-    ElMessage.warning("加载失败！请联系管理员");
-  }
 };
 
 // 点击重命名文件按钮
