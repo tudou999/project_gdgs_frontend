@@ -136,19 +136,19 @@ router.beforeEach((to, from, next) => {
           </el-icon>
           管理员中心
         </el-button>
-        <el-button
-          plain
-          type="success"
-          size="large"
-          v-if="showUserButton"
-          @click="handleGoUser"
-          title="个人中心"
-        >
-          <el-icon style="vertical-align: middle">
-            <User />
-          </el-icon>
-          个人中心
-        </el-button>
+        <!--        <el-button-->
+        <!--          plain-->
+        <!--          type="success"-->
+        <!--          size="large"-->
+        <!--          v-if="showUserButton"-->
+        <!--          @click="handleGoUser"-->
+        <!--          title="个人中心"-->
+        <!--        >-->
+        <!--          <el-icon style="vertical-align: middle">-->
+        <!--            <User />-->
+        <!--          </el-icon>-->
+        <!--          个人中心-->
+        <!--        </el-button>-->
         <el-button
           plain
           type="danger"
