@@ -126,7 +126,7 @@
 
 <script setup>
 import { ChatDotSquare, Check, Close, More } from "@element-plus/icons-vue";
-import { computed, nextTick, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline";
 import ChatRecord from "./ChatRecord.vue";
 import { chatAPI } from "../services/sessions.js";
