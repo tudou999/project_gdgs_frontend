@@ -30,7 +30,7 @@ export default defineConfig({
     host: true,
     proxy: {
       "/api/v1": {
-        target: "http://10.23.22.125:3000",
+        target: "http://10.23.22.125:8080",
         changeOrigin: true,
 
         ws: false,
