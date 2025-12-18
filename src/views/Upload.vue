@@ -3,7 +3,7 @@
     <!-- 返回文件夹按钮 -->
     <el-header>
       <el-button
-        style="align-items: center"
+        style="position: relative; left: 25%"
         type="primary"
         size="large"
         @click="goBackToFileSystem()"
@@ -12,26 +12,30 @@
     </el-header>
 
     <!-- 上传组件 -->
-    <el-upload
-      class="upload-demo"
-      drag
-      action=""
-      :http-request="uploadFile"
-      multiple
-    >
-      <!-- 上传图标及操作提示 -->
-      <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-      <div class="el-upload__text">拖拽文件至此处或 <em>点击上传文件</em></div>
+    <div style="display: flex; justify-content: center">
+      <el-upload
+        style="width: 50%"
+        drag
+        action=""
+        :http-request="uploadFile"
+        multiple
+      >
+        <!-- 上传图标及操作提示 -->
+        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+        <div class="el-upload__text">
+          拖拽文件至此处或 <em>点击上传文件</em>
+        </div>
 
-      <!-- 文件大小提示 -->
-      <template #tip>
-        <div class="el-upload__tip">文件大小在100MB内</div>
-      </template>
-    </el-upload>
+        <!-- 文件大小提示 -->
+        <template #tip>
+          <div class="el-upload__tip">文件大小在100MB内</div>
+        </template>
+      </el-upload>
+    </div>
   </el-container>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ElMessage } from "element-plus";
 import { UploadFilled } from "@element-plus/icons-vue";
 import { useRoute, useRouter } from "vue-router";
@@ -62,15 +66,15 @@ const uploadFile = async (options) => {
         }
       },
     );
-    if (res.data.code === 200) {
+    if (res.code === 200) {
       ElMessage.success("上传成功！");
       if (onSuccess) {
         onSuccess(res, file);
       }
     } else {
-      ElMessage.error("上传失败：" + (res.data.msg || "未知错误"));
+      ElMessage.error("上传失败：" + (res.msg || "未知错误"));
       if (onError) {
-        onError(new Error(res.data.msg || "上传失败"));
+        onError(new Error(res.msg || "上传失败"));
       }
     }
   } catch (error) {

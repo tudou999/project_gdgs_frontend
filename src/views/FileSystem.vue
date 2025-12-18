@@ -28,7 +28,7 @@ const router = useRouter();
 
 const breadcrumbTrail = ref<TrailItemType[]>([{ id: null, name: "全部文件" }]);
 // 处于重命名状态的文件 ID
-const renamingId = ref<string>("");
+const renamingId = ref<string | null>(null);
 
 // 面包屑名称缓存：ID -> Name
 const folderCache = new Map();
@@ -212,8 +212,12 @@ const clickCreateFolder = async (): Promise<void> => {
   existingNew.value = true;
 };
 
+// 是否正在重命名文件
+const isRenaming = ref<boolean>(false);
+
 // 点击重命名文件按钮
 const clickRenameButton = async (file: FileRawInfoType) => {
+  renamingId.value = file.id;
   // 清空其他项的编辑态
   if (Array.isArray(fileList.value)) {
     fileList.value.forEach((f) => {
@@ -312,13 +316,13 @@ const createFolder = async (
   } catch (error) {
     console.error("创建文件夹失败:", error);
     ElMessage.warning("创建文件夹失败！请联系管理员");
+  } finally {
+    isRenaming.value = false;
   }
 };
 
 // 重命名文件夹
 const renameFF = async (myId: string, newName: string): Promise<void> => {
-  if (renamingId.value) return;
-  renamingId.value = myId;
   try {
     const res = await fileAPI.putRenameFile(myId, newName);
     if (res.code === 200) {
@@ -330,6 +334,7 @@ const renameFF = async (myId: string, newName: string): Promise<void> => {
       ElMessage.error("重命名失败：" + res.msg);
     }
   } finally {
+    isRenaming.value = false;
     renamingId.value = "";
   }
 };
@@ -341,8 +346,55 @@ const checkOrRename = async (
   myId: string,
   newName: string,
 ): Promise<void> => {
+  isRenaming.value = true;
   if (editing === 1) await createFolder(fatherId, newName);
   else if (editing === 2) await renameFF(myId, newName);
+};
+
+// 判断确认按钮是否应该显示 loading 状态
+const isConfirmButtonLoading = (
+  file: FileRawInfoType | FolderTempInfoType,
+): boolean => {
+  // 如果不在执行操作，不显示 loading
+  if (!isRenaming.value) return false;
+  
+  // 如果是新建文件夹（editing === 1），显示 loading
+  if (file.editing === 1) return true;
+  
+  // 如果是重命名（editing === 2），只有当前文件显示 loading
+  if (file.editing === 2) {
+    return renamingId.value === file.id;
+  }
+  
+  return false;
+};
+
+// 判断确认按钮是否应该被禁用
+const isConfirmButtonDisabled = (
+  file: FileRawInfoType | FolderTempInfoType,
+): boolean => {
+  // 如果正在执行操作，禁用所有按钮（防止重复点击）
+  if (isRenaming.value) return true;
+  
+  // 如果是重命名状态（editing === 2）
+  if (file.editing === 2) {
+    // 如果 renamingId 有值但不等于当前文件 ID，说明有其他文件正在重命名，禁用当前按钮
+    if (renamingId.value && renamingId.value !== file.id) {
+      return true;
+    }
+  }
+  
+  // 其他情况不禁用
+  return false;
+};
+
+// 取消编辑操作（取消新建文件夹或重命名）
+const cancelEdit = async () => {
+  // 清空所有状态
+  renamingId.value = "";
+  isRenaming.value = false;
+  // 重新加载内容，这会重置所有文件的 editing 状态
+  await reloadContent();
 };
 
 // 删除文件
@@ -613,12 +665,12 @@ const gotoUpload = () => {
               checkOrRename(file.editing!, currentFolderId, file.id, file.name)
             "
             size="small"
-            :loading="renamingId === file.id"
-            :disabled="renamingId && renamingId !== file.id"
+            :loading="isConfirmButtonLoading(file)"
+            :disabled="isConfirmButtonDisabled(file)"
           >
             <el-icon><Check /></el-icon>
           </el-button>
-          <el-button @click="reloadContent()" size="small">
+          <el-button @click="cancelEdit()" size="small">
             <el-icon><Close /></el-icon>
           </el-button>
         </div>
