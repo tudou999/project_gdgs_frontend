@@ -121,18 +121,17 @@ onMounted(loadUserInfo);
   }
 
   .cards-grid {
+    max-width: 50%;
     display: grid;
     grid-template-columns: repeat(1, 1fr);
-    gap: 2rem;
+    gap: 0;
     justify-items: center;
     padding: 1rem;
 
     @media (min-width: 768px) {
       grid-template-columns: repeat(2, 1fr);
-    }
-
-    @media (min-width: 1200px) {
-      grid-template-columns: repeat(4, 1fr);
+      max-width: 800px;
+      margin: 0 auto;
     }
   }
 
