@@ -23,9 +23,8 @@ const addAuthHeader = (
 // 统一错误处理
 const handleResponseError = (error: AxiosError | Error) => {
   // 主动取消的请求不提示错误
-  if (axios.isCancel(error)) {
-    return Promise.reject(error);
-  }
+  if (axios.isCancel(error)) return Promise.reject(error);
+
   const response = (error as AxiosError).response;
   if (response && response.status !== 200)
     ElMessage.warning("响应失败！请联系管理员");

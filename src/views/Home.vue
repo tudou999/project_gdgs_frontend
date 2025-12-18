@@ -29,7 +29,7 @@ defineOptions({
   name: "Home",
 });
 
-import { ref, computed, onMounted, type Ref } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useDark } from "@vueuse/core";
 import {
   ChatBubbleLeftRightIcon,
