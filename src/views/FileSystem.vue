@@ -20,6 +20,9 @@ import type {
   TrailItemType,
 } from "../interface/TfileSystem.ts";
 import type { AxiosProgressEvent } from "axios";
+import type { VirtualElement } from "@popperjs/core";
+
+const deleteVirtualRef = ref<VirtualElement | null>(null);
 
 defineOptions({ name: "FileController" });
 
@@ -357,15 +360,15 @@ const isConfirmButtonLoading = (
 ): boolean => {
   // 如果不在执行操作，不显示 loading
   if (!isRenaming.value) return false;
-  
+
   // 如果是新建文件夹（editing === 1），显示 loading
   if (file.editing === 1) return true;
-  
+
   // 如果是重命名（editing === 2），只有当前文件显示 loading
   if (file.editing === 2) {
     return renamingId.value === file.id;
   }
-  
+
   return false;
 };
 
@@ -375,7 +378,7 @@ const isConfirmButtonDisabled = (
 ): boolean => {
   // 如果正在执行操作，禁用所有按钮（防止重复点击）
   if (isRenaming.value) return true;
-  
+
   // 如果是重命名状态（editing === 2）
   if (file.editing === 2) {
     // 如果 renamingId 有值但不等于当前文件 ID，说明有其他文件正在重命名，禁用当前按钮
@@ -383,7 +386,7 @@ const isConfirmButtonDisabled = (
       return true;
     }
   }
-  
+
   // 其他情况不禁用
   return false;
 };
@@ -397,6 +400,8 @@ const cancelEdit = async () => {
   await reloadContent();
 };
 
+const deleteConfirmVisible = ref(false);
+const deleteTargetId = ref<string | null>(null);
 // 删除文件
 const deleteFile = async (id: string) => {
   try {
@@ -719,44 +724,52 @@ const gotoUpload = () => {
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item
-                  @click="downloadFile(file.id, file.name)"
+                  @click="openUploadInfoDialog(file.id)"
                   v-if="!file.folder"
-                  >下载</el-dropdown-item
+                  >上传文件信息</el-dropdown-item
                 >
-                <el-dropdown-item @click="clickRenameButton(file)"
-                  >重命名</el-dropdown-item
-                >
-                <el-dropdown-item class="my-class">
-                  <el-popconfirm
-                    icon-color="#f56c6c"
-                    title="确定要删除吗？"
-                    confirm-button-text="确定"
-                    @confirm="deleteFile(file.id)"
-                    confirm-button-type="danger"
-                    cancel-button-text="取消"
-                    @cancel="reloadContent()"
-                    cancel-button-type="info"
-                  >
-                    <template #reference>
-                      <span class="dropdown-item-delete-fullSpan">删除</span>
-                    </template>
-                  </el-popconfirm>
-                </el-dropdown-item>
                 <el-dropdown-item
                   @click="clickInfoButton(file.id)"
                   v-if="!file.folder"
                   >查看文件信息</el-dropdown-item
                 >
                 <el-dropdown-item
+                  @click="downloadFile(file.id, file.name)"
+                  v-if="!file.folder"
+                  >下载</el-dropdown-item
+                >
+                <el-dropdown-item
                   @click="openMoveDialog(file)"
                   v-if="!file.folder"
                   >移动</el-dropdown-item
                 >
-                <el-dropdown-item
-                  @click="openUploadInfoDialog(file.id)"
-                  v-if="!file.folder"
-                  >上传文件信息</el-dropdown-item
+                <el-dropdown-item @click="clickRenameButton(file)"
+                  >重命名</el-dropdown-item
                 >
+                <el-dropdown-item
+                  @click="
+                    (e: MouseEvent) => {
+                      deleteTargetId = file.id;
+                      const { clientX, clientY } = e;
+
+                      deleteVirtualRef = {
+                        getBoundingClientRect: () =>
+                          ({
+                            width: 0,
+                            height: 0,
+                            top: clientY,
+                            bottom: clientY,
+                            left: clientX,
+                            right: clientX,
+                          }) as DOMRect,
+                      };
+
+                      deleteConfirmVisible = true;
+                    }
+                  "
+                >
+                  删除
+                </el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -866,6 +879,18 @@ const gotoUpload = () => {
         </template>
       </el-dialog>
     </el-main>
+    <el-popconfirm
+      v-model:visible="deleteConfirmVisible"
+      :virtual-ref="deleteVirtualRef"
+      virtual-triggering
+      title="确定要删除吗？"
+      confirm-button-type="danger"
+      @confirm="deleteFile(deleteTargetId!)"
+      @cancel="deleteConfirmVisible = false"
+      :append-to-body="true"
+      confirm-button-text="确认"
+      cancel-button-text="取消"
+    />
   </el-container>
 </template>
 
