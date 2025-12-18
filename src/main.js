@@ -4,8 +4,7 @@ import App from "./App.vue";
 import router from "./router";
 import ElementPlus from "element-plus";
 import "element-plus/dist/index.css";
-import * as ElementPlusIconsVue from "@element-plus/icons-vue";
-// // 引入sentry
+// 引入sentry
 import * as Sentry from "@sentry/vue";
 // 引入暗黑主题
 import "element-plus/theme-chalk/dark/css-vars.css";
