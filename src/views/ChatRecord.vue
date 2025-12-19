@@ -40,6 +40,8 @@ const emit = defineEmits(["chat-created"]);
 
 // 本地 UI 与分页状态
 const messagesRef = ref(null); // 消息列表容器，用于滚动控制和无限加载
+const topSentinelRef = ref(null); // 顶部哨兵元素，用于 Intersection Observer 检测
+const bottomSentinelRef = ref(null); // 底部哨兵元素，用于检测是否接近底部
 const userInput = ref(""); // 文本输入框绑定的用户输入
 const isStreaming = ref(false); // 当前是否在流式输出中，控制按钮禁用等
 const currentMessages = ref([]); // 当前会话下展示的消息数组
@@ -56,6 +58,8 @@ let lastReceivedChunkId = null; // 最后收到的 SSE chunk ID，用于断点�
 const activeAssistantMessage = ref(null); // 正在流式输出的 AI 消息对象
 // 是否显示骨架屏
 const { skeletonRef: showSkeleton, runWithSkeleton } = useSkeleton();
+let topObserver = null; // 顶部 Intersection Observer 实例
+let bottomObserver = null; // 底部 Intersection Observer 实例
 
 const isWaitingForChunk = computed(
   () => isStreaming.value && typingBuffer.value.length === 0,
@@ -293,6 +297,8 @@ async function loadChat(chatId) {
 
     await nextTick();
     await scrollToBottom(true);
+    // 重新初始化 Observer，确保哨兵元素被正确观察
+    initIntersectionObservers();
   } catch (error) {
     // 如果是主动取消的请求，不做处理
     if (error?.name === "CanceledError" || signal.aborted) {
@@ -341,6 +347,8 @@ async function loadMoreMessages() {
         const newScrollHeight = container.scrollHeight;
         container.scrollTop = newScrollHeight - previousScrollHeight;
       }
+      // 重新初始化 Observer，确保哨兵元素被正确观察
+      initIntersectionObservers();
     } else {
       hasMore.value = false;
     }
@@ -485,35 +493,62 @@ async function scrollToBottom(force = false) {
   container.scrollTop = container.scrollHeight;
 }
 
-// 监听消息容器滚动事件，实现分页加载/自动滚动控制
-function handleMessagesScroll() {
-  if (isInitialLoading.value) {
-    // 正在加载第一页时，不允许触发“加载更多”
-    return;
-  }
-
+// 初始化 Intersection Observer，用于检测顶部和底部哨兵元素
+function initIntersectionObservers() {
   const container = messagesRef.value;
   if (!container) return;
 
-  // 规定触发加载的阈值
-  const thresholdTop = 10;
-  const thresholdBottom = 10;
-
-  // 顶部触发分页加载
-  if (
-    !loadingMore.value &&
-    hasMore.value &&
-    container.scrollTop <= thresholdTop
-  ) {
-    loadMoreMessages();
+  // 清理旧的 Observer
+  if (topObserver) {
+    topObserver.disconnect();
+    topObserver = null;
+  }
+  if (bottomObserver) {
+    bottomObserver.disconnect();
+    bottomObserver = null;
   }
 
-  // 计算距离底部的距离
-  const distanceToBottom =
-    container.scrollHeight - (container.scrollTop + container.clientHeight);
-  // 当用户滚动到底部附近时，autoScrollEnabled设置为true，启用自动滚动
-  // 距离底部 > thresholdBottom 时认为用户在阅读历史，不再强制滚动
-  autoScrollEnabled.value = distanceToBottom <= thresholdBottom;
+  // 创建顶部 Observer：当顶部哨兵元素进入视口时，加载更多历史消息
+  topObserver = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0];
+      if (
+        entry.isIntersecting &&
+        !isInitialLoading.value &&
+        !loadingMore.value &&
+        hasMore.value
+      ) {
+        loadMoreMessages();
+      }
+    },
+    {
+      root: container,
+      rootMargin: "0px",
+      threshold: 0.1, // 当哨兵元素 10% 可见时触发
+    },
+  );
+
+  // 创建底部 Observer：当底部哨兵元素进入视口时，启用自动滚动
+  bottomObserver = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[0];
+      // 当底部哨兵元素可见时，说明用户已经滚动到底部附近，启用自动滚动
+      autoScrollEnabled.value = entry.isIntersecting;
+    },
+    {
+      root: container,
+      rootMargin: "0px",
+      threshold: 0.1,
+    },
+  );
+
+  // 开始观察哨兵元素
+  if (topSentinelRef.value) {
+    topObserver.observe(topSentinelRef.value);
+  }
+  if (bottomSentinelRef.value) {
+    bottomObserver.observe(bottomSentinelRef.value);
+  }
 }
 
 // 计算并保存当前流式缓存到本地
@@ -540,10 +575,11 @@ onMounted(() => {
 
   // 监听浏览器刷新/关闭/跳转事件
   window.addEventListener("beforeunload", () => saveStreamCache());
-  // 监听滚动事件
-  if (messagesRef.value) {
-    messagesRef.value.addEventListener("scroll", handleMessagesScroll);
-  }
+  
+  // 初始化 Intersection Observer
+  nextTick(() => {
+    initIntersectionObservers();
+  });
 });
 
 // 监听 mode 变化，保存到 localStorage
@@ -592,6 +628,10 @@ watch(
 
     // 建立当前会话的SSE连接，监听实时消息
     subscribeToSession(newId, sessionCache);
+    
+    // 确保 Observer 已正确初始化
+    await nextTick();
+    initIntersectionObservers();
   },
 );
 
@@ -600,10 +640,16 @@ onBeforeUnmount(() => {
   // 卸载前保存当前流式缓存
   saveStreamCache();
 
-  // 移除滚动事件监听
-  if (messagesRef.value) {
-    messagesRef.value.removeEventListener("scroll", handleMessagesScroll);
+  // 清理 Intersection Observer
+  if (topObserver) {
+    topObserver.disconnect();
+    topObserver = null;
   }
+  if (bottomObserver) {
+    bottomObserver.disconnect();
+    bottomObserver = null;
+  }
+  
   // 清理定时器
   if (typingTimer) {
     clearInterval(typingTimer);
@@ -624,6 +670,9 @@ onBeforeUnmount(() => {
 <template>
   <div class="chat-record">
     <div class="messages" ref="messagesRef">
+      <!-- 顶部哨兵元素：用于检测是否滚动到顶部，触发加载更多 -->
+      <div ref="topSentinelRef" class="sentinel"></div>
+      
       <!-- 骨架屏：加载超过300ms时显示，模拟一问一答的对话形式 -->
       <template v-if="showSkeleton">
         <template v-for="i in 2" :key="'skeleton-pair-' + i">
@@ -657,6 +706,9 @@ onBeforeUnmount(() => {
           @regenerate="handleRegenerate"
         />
       </template>
+      
+      <!-- 底部哨兵元素：用于检测是否滚动到底部，控制自动滚动 -->
+      <div ref="bottomSentinelRef" class="sentinel"></div>
     </div>
     <div class="input-area">
       <div class="input-wrapper">
@@ -721,6 +773,13 @@ onBeforeUnmount(() => {
   > * {
     width: 70%;
     margin: 0 auto;
+  }
+
+  // 哨兵元素：用于 Intersection Observer 检测
+  .sentinel {
+    width: 100%;
+    height: 1px;
+    flex-shrink: 0;
   }
 
   // 骨架屏消息样式，模拟聊天对话形式
