@@ -11,7 +11,7 @@ import {
   ref,
   watch,
 } from "vue";
-import { Position } from "@element-plus/icons-vue";
+import { Position, Close } from "@element-plus/icons-vue";
 import ChatMessage from "../components/ChatMessage.vue";
 import { chatAPI } from "../services/sessions.js";
 import IconStop from "../components/icons/IconStop.vue";
@@ -42,6 +42,7 @@ const emit = defineEmits(["chat-created"]);
 const messagesRef = ref(null); // 消息列表容器，用于滚动控制和无限加载
 const topSentinelRef = ref(null); // 顶部哨兵元素，用于 Intersection Observer 检测
 const bottomSentinelRef = ref(null); // 底部哨兵元素，用于检测是否接近底部
+const textareaRef = ref(null); // textarea 元素引用，用于自动调整高度
 const userInput = ref(""); // 文本输入框绑定的用户输入
 const isStreaming = ref(false); // 当前是否在流式输出中，控制按钮禁用等
 const currentMessages = ref([]); // 当前会话下展示的消息数组
@@ -368,6 +369,42 @@ function handleInputEnter() {
   startStream(userInput.value);
 }
 
+// 处理键盘事件：Enter 发送，Shift+Enter 换行
+const handleKeydown = (e) => {
+  // 只处理 Enter 键
+  if (e.key === "Enter" || e.keyCode === 13) {
+    // Shift + Enter 换行，单独 Enter 发送
+    if (e.shiftKey) {
+      return; // 允许换行，不阻止默认行为
+    }
+    e.preventDefault();
+    handleInputEnter();
+  }
+  // 其他按键不处理，允许正常输入
+};
+
+// 自动调整 textarea 高度
+function adjustTextareaHeight() {
+  const textarea = textareaRef.value;
+  if (!textarea) return;
+
+  // 重置高度以获取正确的 scrollHeight
+  textarea.style.height = "auto";
+  const minHeight = 40; // 最小高度（约等于 1 行）
+  const maxHeight = 200; // 最大高度（约等于 6 行）
+  const newHeight = Math.min(
+    Math.max(textarea.scrollHeight, minHeight),
+    maxHeight,
+  );
+  textarea.style.height = `${newHeight}px`;
+}
+
+// 清空输入框
+function clearInput() {
+  userInput.value = "";
+  adjustTextareaHeight();
+}
+
 // 开始流式发送消息
 async function startStream(data) {
   const prompt = data.trim();
@@ -376,6 +413,10 @@ async function startStream(data) {
   isStreaming.value = true;
   userInput.value = "";
   typingBuffer.value = "";
+  // 重置 textarea 高度
+  nextTick(() => {
+    adjustTextareaHeight();
+  });
   if (typingTimer) {
     clearInterval(typingTimer);
     typingTimer = null;
@@ -575,10 +616,19 @@ onMounted(() => {
 
   // 监听浏览器刷新/关闭/跳转事件
   window.addEventListener("beforeunload", () => saveStreamCache());
-  
+
   // 初始化 Intersection Observer
   nextTick(() => {
     initIntersectionObservers();
+    // 初始化 textarea 高度
+    adjustTextareaHeight();
+  });
+});
+
+// 监听 userInput 变化，自动调整高度
+watch(userInput, () => {
+  nextTick(() => {
+    adjustTextareaHeight();
   });
 });
 
@@ -628,7 +678,7 @@ watch(
 
     // 建立当前会话的SSE连接，监听实时消息
     subscribeToSession(newId, sessionCache);
-    
+
     // 确保 Observer 已正确初始化
     await nextTick();
     initIntersectionObservers();
@@ -649,7 +699,7 @@ onBeforeUnmount(() => {
     bottomObserver.disconnect();
     bottomObserver = null;
   }
-  
+
   // 清理定时器
   if (typingTimer) {
     clearInterval(typingTimer);
@@ -672,7 +722,7 @@ onBeforeUnmount(() => {
     <div class="messages" ref="messagesRef">
       <!-- 顶部哨兵元素：用于检测是否滚动到顶部，触发加载更多 -->
       <div ref="topSentinelRef" class="sentinel"></div>
-      
+
       <!-- 骨架屏：加载超过300ms时显示，模拟一问一答的对话形式 -->
       <template v-if="showSkeleton">
         <template v-for="i in 2" :key="'skeleton-pair-' + i">
@@ -706,7 +756,7 @@ onBeforeUnmount(() => {
           @regenerate="handleRegenerate"
         />
       </template>
-      
+
       <!-- 底部哨兵元素：用于检测是否滚动到底部，控制自动滚动 -->
       <div ref="bottomSentinelRef" class="sentinel"></div>
     </div>
@@ -714,17 +764,26 @@ onBeforeUnmount(() => {
       <div class="input-wrapper">
         <div class="input-row">
           <!-- TODO：暂时修改死宽度，后面要优化 -->
-          <el-input
-            style="max-width: 685px"
-            clearable
-            size="large"
-            type="textarea"
-            :autosize="{ minRows: 1, maxRows: 6 }"
-            v-model="userInput"
-            @keydown.enter.prevent="handleInputEnter"
-            placeholder="给 CORS 发送消息"
-            resize="none"
-          />
+          <div class="textarea-wrapper" style="max-width: 685px">
+            <textarea
+              ref="textareaRef"
+              v-model="userInput"
+              @keydown="handleKeydown"
+              @input="adjustTextareaHeight"
+              placeholder="给 CORS 发送消息"
+              rows="1"
+              class="custom-textarea"
+            ></textarea>
+            <!-- 清空按钮 -->
+            <button
+              v-if="userInput"
+              @click="clearInput"
+              class="clear-button"
+              type="button"
+            >
+              <el-icon><Close /></el-icon>
+            </button>
+          </div>
           <el-switch
             v-model="mode"
             active-text="在线"
@@ -855,41 +914,58 @@ onBeforeUnmount(() => {
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }
 
-    :deep(.el-input) {
+    .textarea-wrapper {
       flex: 1;
-    }
+      position: relative;
+      display: flex;
+      align-items: center;
 
-    :deep(.el-input__wrapper) {
-      background: transparent;
-      box-shadow: none;
-      border: none;
-      padding-left: 0;
-      padding-right: 0;
-    }
+      .custom-textarea {
+        width: 100%;
+        resize: none;
+        border: none;
+        background: transparent;
+        padding: 0.5rem 2rem 0.5rem 0.5rem;
+        color: inherit;
+        font-family: inherit;
+        font-size: 1rem;
+        line-height: 1.5;
+        min-height: 40px;
+        max-height: 200px;
+        overflow-y: auto;
 
-    :deep(.el-input__inner) {
-      padding-left: 0;
-      padding-right: 0;
-    }
+        &:focus {
+          outline: none;
+        }
 
-    textarea {
-      flex: 1;
-      resize: none;
-      border: none;
-      background: transparent;
-      padding: 0.25rem 0.5rem;
-      color: inherit;
-      font-family: inherit;
-      font-size: 1rem;
-      line-height: 1.5;
-      max-height: 200px;
-
-      &:focus {
-        outline: none;
+        &::placeholder {
+          color: var(--el-text-color-placeholder);
+        }
       }
 
-      &::placeholder {
+      .clear-button {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        padding: 0.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         color: var(--el-text-color-placeholder);
+        transition: color 0.2s;
+        z-index: 1;
+
+        &:hover {
+          color: var(--el-text-color-regular);
+        }
+
+        .el-icon {
+          font-size: 0.875rem;
+        }
       }
     }
 
