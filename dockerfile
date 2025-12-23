@@ -15,7 +15,7 @@ RUN npm install
 COPY . .
 
 # 构建
-RUN npm run build
+RUN npm run build-only
 
 # -------------------------------
 # 运行阶段：使用 Nginx 提供静态资源
