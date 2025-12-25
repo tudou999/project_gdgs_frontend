@@ -57,6 +57,8 @@
     "prettier": "3.6.2",
     "rollup-plugin-visualizer": "^6.0.5",
     "typescript": "~5.7.3",
+    "unplugin-auto-import": "^20.3.0",
+    "unplugin-vue-components": "^30.0.0",
     "vite": "npm:rolldown-vite@latest",
     "vite-plugin-style-import": "^2.0.0",
     "vite-plugin-vue-devtools": "^7.7.2",
