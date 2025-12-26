@@ -359,7 +359,6 @@ onMounted(() => {
   flex-direction: column;
   background: var(--el-bg-color-overlay);
   backdrop-filter: blur(10px);
-  border-radius: 1rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 
   .aside-header {
@@ -385,11 +384,9 @@ onMounted(() => {
     :deep(.el-menu-item) {
       height: auto;
       line-height: 1.4;
-      padding: 0.75rem;
-      margin-bottom: 0.5rem;
-      border-radius: 0.75rem;
+      padding: 0.25rem 0.5rem;
       display: flex;
-      gap: 0.5rem;
+      gap: 0.65rem;
       align-items: center;
       transition: background-color 0.2s;
 
@@ -517,7 +514,6 @@ onMounted(() => {
   flex-direction: column;
   background: var(--el-bg-color-overlay);
   backdrop-filter: blur(10px);
-  border-radius: 1rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
   overflow: hidden; // 防止内容溢出
 
