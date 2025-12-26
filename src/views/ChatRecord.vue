@@ -74,6 +74,56 @@ let sessionSseHandle = null; // 当前会话的SSE连接句柄，用于监听实
 // 模式（本地/在线）（false表示本地，true表示在线）
 const mode = ref(false);
 
+// 根据缓存长度动态调整打字机速度
+// 使用反比例函数实现平滑的速度调节：缓冲区越长，渲染越快
+// 公式：delay = baseDelay / (1 + bufferLength / factor)
+// - bufferLength = 0 时，delay ≈ 25ms（最慢）
+// - bufferLength 增大时，delay 平滑减小（最快约 5ms）
+function computeTypingDelay(bufferLength) {
+  const baseDelay = 25; // 基础延迟（ms），缓冲区为空时的速度
+  const minDelay = 5; // 最小延迟（ms），缓冲区很大时的最快速度
+  const factor = 100; // 调节因子，控制速度变化的敏感度
+
+  // 计算延迟：当 bufferLength 为 0 时接近 baseDelay，增大时接近 minDelay
+  const delay = baseDelay / (1 + bufferLength / factor);
+
+  // 确保延迟在合理范围内
+  return Math.max(minDelay, Math.min(baseDelay, delay));
+}
+
+// 启动打字机渲染
+function startTypingLoop() {
+  if (typingTimer) return;
+
+  const tick = () => {
+    if (!typingBuffer.value.length) {
+      // 仍在流式，则保持轻量轮询等待新 chunk
+      if (isStreaming.value) {
+        typingTimer = setTimeout(tick, 30);
+        return;
+      }
+      clearTimeout(typingTimer);
+      typingTimer = null;
+      activeAssistantMessage.value = null;
+      return;
+    }
+
+    const nextChar = typingBuffer.value[0];
+    typingBuffer.value = typingBuffer.value.slice(1);
+    const msg = activeAssistantMessage.value;
+    if (msg) msg.content += nextChar;
+
+    nextTick(() => scrollToBottom());
+
+    typingTimer = setTimeout(
+      tick,
+      computeTypingDelay(typingBuffer.value.length),
+    );
+  };
+
+  typingTimer = setTimeout(tick, computeTypingDelay(typingBuffer.value.length));
+}
+
 // 重置分页状态
 function resetPagination() {
   pageNum.value = 1;
@@ -112,23 +162,7 @@ function NewSSE(sessionId) {
 
       typingBuffer.value += chunk;
 
-      if (!typingTimer)
-        typingTimer = setInterval(() => {
-          if (!typingBuffer.value.length) {
-            if (!isStreaming.value) {
-              clearInterval(typingTimer);
-              typingTimer = null;
-              activeAssistantMessage.value = null;
-            }
-            return;
-          }
-          const nextChar = typingBuffer.value[0];
-          typingBuffer.value = typingBuffer.value.slice(1);
-          const msg = activeAssistantMessage.value;
-          if (msg) msg.content += nextChar;
-
-          nextTick(() => scrollToBottom());
-        }, 20);
+      startTypingLoop();
     },
     onFinish() {
       // 只有当这个连接确实是当前激活的连接时，才清理全局句柄
@@ -146,7 +180,7 @@ function NewSSE(sessionId) {
       }
       isStreaming.value = false;
       if (typingTimer) {
-        clearInterval(typingTimer);
+        clearTimeout(typingTimer);
         typingTimer = null;
       }
       activeAssistantMessage.value = null;
@@ -215,23 +249,7 @@ function subscribeToSession(sessionId, sessionCache) {
 
       typingBuffer.value += chunk;
 
-      if (!typingTimer)
-        typingTimer = setInterval(() => {
-          if (!typingBuffer.value.length) {
-            if (!isStreaming.value) {
-              clearInterval(typingTimer);
-              typingTimer = null;
-              activeAssistantMessage.value = null;
-            }
-            return;
-          }
-          const nextChar = typingBuffer.value[0];
-          typingBuffer.value = typingBuffer.value.slice(1);
-          const msg = activeAssistantMessage.value;
-          if (msg) msg.content += nextChar;
-
-          nextTick(() => scrollToBottom());
-        }, 20);
+      startTypingLoop();
     },
     onFinish() {
       // 只有当这个连接确实是当前激活的连接时，才清理全局句柄
@@ -249,7 +267,7 @@ function subscribeToSession(sessionId, sessionCache) {
       }
       isStreaming.value = false;
       if (typingTimer) {
-        clearInterval(typingTimer);
+        clearTimeout(typingTimer);
         typingTimer = null;
       }
       activeAssistantMessage.value = null;
@@ -419,7 +437,7 @@ async function startStream(data) {
       adjustTextareaHeight();
     });
     if (typingTimer) {
-      clearInterval(typingTimer);
+      clearTimeout(typingTimer);
       typingTimer = null;
     }
 
@@ -456,7 +474,7 @@ async function startStream(data) {
     adjustTextareaHeight();
   });
   if (typingTimer) {
-    clearInterval(typingTimer);
+    clearTimeout(typingTimer);
     typingTimer = null;
   }
 
@@ -516,7 +534,7 @@ async function startStream(data) {
     // startChat 或 subscribeChatStream 出错
     isStreaming.value = false;
     if (!typingBuffer.value.length && typingTimer) {
-      clearInterval(typingTimer);
+      clearTimeout(typingTimer);
       typingTimer = null;
     }
     console.error("发送消息失败:", err);
@@ -541,7 +559,7 @@ function stopStream() {
 
   typingBuffer.value = "";
   if (typingTimer) {
-    clearInterval(typingTimer);
+    clearTimeout(typingTimer);
     typingTimer = null;
   }
   if (activeAssistantMessage.value) {
@@ -699,7 +717,7 @@ watch(
       skeletonTimer = null;
     }
     if (typingTimer) {
-      clearInterval(typingTimer);
+      clearTimeout(typingTimer);
       typingTimer = null;
     }
 
@@ -738,7 +756,7 @@ onBeforeUnmount(() => {
 
   // 清理定时器
   if (typingTimer) {
-    clearInterval(typingTimer);
+    clearTimeout(typingTimer);
     typingTimer = null;
   }
   if (skeletonTimer) {
