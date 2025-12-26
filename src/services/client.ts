@@ -54,10 +54,15 @@ axiosInstance.interceptors.response.use(
   (res: AxiosResponse) => res.data,
   handleResponseError,
 );
-rawAxiosInstance.interceptors.response.use(
-  (res: AxiosResponse) => res.data,
-  handleResponseError,
-);
+rawAxiosInstance.interceptors.response.use((res: AxiosResponse) => {
+  if (
+    res.config.responseType === "blob" ||
+    res.config.responseType === "arraybuffer"
+  )
+    return res;
+
+  return res.data;
+}, handleResponseError);
 
 // 定义统一返回 ResType 的客户端接口
 interface RestClient {

@@ -58,7 +58,7 @@ export const fileAPI = {
   // 上传文件
   postUploadFile(
     id: string,
-    file,
+    file: FormData,
     onProgress?: (event: AxiosProgressEvent) => void,
   ) {
     return rawApiClient.post(`${FILE_API_BASE_URL}/upload`, file, {
