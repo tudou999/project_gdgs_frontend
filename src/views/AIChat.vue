@@ -52,6 +52,7 @@
 
           <div v-else class="rename-editing" @click.stop>
             <el-input
+              class="rename-input"
               ref="refInput"
               v-model="chat.title"
               size="default"
@@ -59,7 +60,6 @@
               clearable
               @keydown.enter.stop.prevent="confirmRename(chat)"
               :disabled="renamingId && renamingId !== chat.id"
-              class="rename-input"
             />
             <div class="rename-actions">
               <el-button
@@ -73,7 +73,7 @@
                 <el-icon style="margin: 0"><Check /></el-icon>
               </el-button>
               <el-button
-                style="padding: 5px 0"
+                style="padding: 5px 0; margin-left: 6px"
                 size="small"
                 @click.stop="cancelRename(chat)"
                 :disabled="renamingId && renamingId !== chat.id"
@@ -389,6 +389,7 @@ onMounted(() => {
       gap: 0.65rem;
       align-items: center;
       transition: background-color 0.2s;
+      min-height: 40px;
 
       &.is-active,
       &:hover {
@@ -781,6 +782,14 @@ onMounted(() => {
       }
     }
   }
+}
+
+:deep(.el-input__clear) {
+  margin: 0;
+}
+
+:deep(.el-input__wrapper) {
+  padding: 0 5px;
 }
 
 @media (max-width: 768px) {
