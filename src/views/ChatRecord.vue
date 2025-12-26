@@ -410,6 +410,44 @@ async function startStream(data) {
   const prompt = data.trim();
   if (!prompt) return;
 
+  // 新建会话时，直接创建真实会话并发送消息，不在本地先渲染临时气泡
+  if (props.chatId === "0") {
+    isStreaming.value = true;
+    userInput.value = "";
+    typingBuffer.value = "";
+    nextTick(() => {
+      adjustTextareaHeight();
+    });
+    if (typingTimer) {
+      clearInterval(typingTimer);
+      typingTimer = null;
+    }
+
+    isPromotingFromLocal.value = true;
+    try {
+      const title = prompt.slice(0, 12);
+      const res = await chatAPI.postCreateSession(title);
+      const newId = res.data;
+
+      await chatAPI.postMessage({
+        message: prompt,
+        sessionId: newId,
+        mode: mode.value ? ChatMode.Online : ChatMode.Local,
+      });
+
+      // 通知父组件切换到真实会话；切换后再由新会话负责流式渲染
+      emit("chat-created", { id: newId, title });
+    } catch (error) {
+      console.error("创建会话并发送消息失败:", error);
+      ElMessage.error("发送失败，请稍后重试");
+    } finally {
+      isPromotingFromLocal.value = false;
+      isStreaming.value = false;
+    }
+
+    return;
+  }
+
   isStreaming.value = true;
   userInput.value = "";
   typingBuffer.value = "";
@@ -610,9 +648,7 @@ const closeSse = () => {
 onMounted(() => {
   // 从 localStorage 读取保存的模式
   const savedMode = localStorage.getItem("chatMode");
-  if (savedMode !== null) {
-    mode.value = savedMode === "true"; // localStorage 存储的是字符串
-  }
+  if (savedMode !== null) mode.value = savedMode === "true"; // localStorage 存储的是字符串
 
   // 监听浏览器刷新/关闭/跳转事件
   window.addEventListener("beforeunload", () => saveStreamCache());
