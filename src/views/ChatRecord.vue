@@ -76,19 +76,19 @@ const mode = ref(false);
 
 // 根据缓存长度动态调整打字机速度
 // 使用反比例函数实现平滑的速度调节：缓冲区越长，渲染越快
-// 公式：delay = baseDelay / (1 + bufferLength / factor)
+// 公式：delay = maxDelay / (1 + bufferLength / factor)
 // - bufferLength = 0 时，delay ≈ 25ms（最慢）
 // - bufferLength 增大时，delay 平滑减小（最快约 5ms）
 function computeTypingDelay(bufferLength) {
-  const baseDelay = 25; // 基础延迟（ms），缓冲区为空时的速度
+  const maxDelay = 25; // 最大延迟（ms），缓冲区为空时的速度
   const minDelay = 5; // 最小延迟（ms），缓冲区很大时的最快速度
   const factor = 100; // 调节因子，控制速度变化的敏感度
 
-  // 计算延迟：当 bufferLength 为 0 时接近 baseDelay，增大时接近 minDelay
-  const delay = baseDelay / (1 + bufferLength / factor);
+  // 计算延迟：当 bufferLength 为 0 时接近 maxDelay，增大时接近 minDelay
+  const delay = maxDelay / (1 + bufferLength / factor);
 
   // 确保延迟在合理范围内
-  return Math.max(minDelay, Math.min(baseDelay, delay));
+  return Math.max(minDelay, Math.min(maxDelay, delay));
 }
 
 // 启动打字机渲染
@@ -549,14 +549,6 @@ function stopStream() {
     .catch((err) => console.error("停止对话失败:", err));
   isStreaming.value = false;
 
-  // // TODO：如果缓冲区还有剩余内容，立即全部显示
-  // if (typingBuffer.value.length > 0 && activeAssistantMessage.value) {
-  //   const msg = activeAssistantMessage.value;
-  //   msg.content += typingBuffer.value;
-  //   typingBuffer.value = "";
-  //   nextTick(() => scrollToBottom());
-  // }
-
   typingBuffer.value = "";
   if (typingTimer) {
     clearTimeout(typingTimer);
@@ -662,6 +654,19 @@ const closeSse = () => {
   sessionSseHandle.cancel();
   sessionSseHandle = null;
 };
+
+// 清理 Intersection Observer
+const cleanupObservers = () => {
+  if (topObserver) {
+    topObserver.disconnect();
+    topObserver = null;
+  }
+  if (bottomObserver) {
+    bottomObserver.disconnect();
+    bottomObserver = null;
+  }
+};
+
 // 组件挂载
 onMounted(() => {
   // 从 localStorage 读取保存的模式
@@ -695,7 +700,9 @@ watch(mode, (newMode) => {
 watch(
   () => props.chatId,
   async (newId, oldId) => {
-    // 离开
+    // 清理 Intersection Observer
+    cleanupObservers();
+
     // 有sse => 关闭连接 + 保存旧会话缓存
     if (sessionSseHandle) {
       closeSse();
@@ -745,14 +752,7 @@ onBeforeUnmount(() => {
   saveStreamCache();
 
   // 清理 Intersection Observer
-  if (topObserver) {
-    topObserver.disconnect();
-    topObserver = null;
-  }
-  if (bottomObserver) {
-    bottomObserver.disconnect();
-    bottomObserver = null;
-  }
+  cleanupObservers();
 
   // 清理定时器
   if (typingTimer) {
