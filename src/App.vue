@@ -7,6 +7,9 @@ import { useRouter } from "vue-router";
 import { ref, computed, onMounted } from "vue";
 import { User, SwitchButton, HomeFilled } from "@element-plus/icons-vue";
 import { useUserStore } from "./stores/user";
+import { UseAPI } from "./services/user";
+import { ElMessage } from "element-plus";
+import axios from "axios";
 
 const isDark = useDark();
 const toggleDark = useToggle(isDark);
@@ -33,10 +36,42 @@ const handleGoHome = () => {
 };
 
 // 检查登录状态
-const checkLoginStatus = () => {
+const checkLoginStatus = async () => {
   const token = localStorage.getItem("token");
-  // 如果缓存中有token，value为true，否则为false
-  isLoggedIn.value = !!token;
+  // 如果没有token，直接设置为未登录
+  if (!token) {
+    isLoggedIn.value = false;
+    return;
+  }
+
+  // 如果有token，尝试验证token是否有效
+  try {
+    const res = await UseAPI.getUserInfo();
+    // 如果请求成功，说明token有效
+    if (res.code === 200) {
+      isLoggedIn.value = true;
+      // 更新用户角色信息
+      if (res.data?.role) userStore.setRole(res.data.role);
+    } else handleTokenInvalid();
+  } catch (error) {
+    // 捕获错误，检查是否是401未授权错误
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      if (status === 401) handleTokenInvalid();
+      else isLoggedIn.value = false;
+    } else isLoggedIn.value = false;
+  }
+};
+
+// 处理token无效的情况
+const handleTokenInvalid = () => {
+  userStore.clearToken();
+  isLoggedIn.value = false;
+  // 如果当前不在登录/注册页面，提示并跳转到登录页
+  if (currentRoute.value !== "/login" && currentRoute.value !== "/register") {
+    ElMessage.warning("登录已过期，请重新登录");
+    router.push("/login");
+  }
 };
 
 // 退出登录
@@ -77,9 +112,9 @@ onMounted(() => {
 });
 
 // 添加全局路由守卫
-router.beforeEach((to, from, next) => {
-  // 检查登录状态
-  checkLoginStatus();
+router.beforeEach(async (to, from, next) => {
+  // 检查登录状态（异步）
+  await checkLoginStatus();
 
   // 如果用户未登录且访问需要登录的页面，重定向到登录页
   const publicRoutes = ["/login", "/register"];
