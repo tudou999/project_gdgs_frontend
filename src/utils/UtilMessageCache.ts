@@ -5,6 +5,7 @@
 interface CacheData {
   content: string;
   lastChunkId: string | null;
+  isWaitingResponse?: boolean;
 }
 
 const CACHE_PREFIX = "sessionCache_";
@@ -13,12 +14,18 @@ class MessageCache {
   /**
    * 保存缓存
    */
-  save(sessionId: string, content: string, lastChunkId: string | null): void {
-    if (!sessionId || !content) return;
+  save(
+    sessionId: string, 
+    content: string, 
+    lastChunkId: string | null,
+    isWaitingResponse: boolean = false
+  ): void {
+    if (!sessionId) return;
 
     const data: CacheData = {
       content,
       lastChunkId,
+      isWaitingResponse,
     };
 
     try {

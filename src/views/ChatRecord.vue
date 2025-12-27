@@ -45,6 +45,7 @@ const bottomSentinelRef = ref(null); // 底部哨兵元素，用于检测是否�
 const textareaRef = ref(null); // textarea 元素引用，用于自动调整高度
 const userInput = ref(""); // 文本输入框绑定的用户输入
 const isStreaming = ref(false); // 当前是否在流式输出中，控制按钮禁用等
+const isWaitingResponse = ref(false); // 是否正在等待后端响应（发送消息后到收到第一个chunk之间）
 const currentMessages = ref([]); // 当前会话下展示的消息数组
 const autoScrollEnabled = ref(true); // 是否允许自动滚动到底部（用户不阅读历史时）
 const pageNum = ref(1); // 当前分页页码，用于向后端请求更多历史
@@ -63,7 +64,9 @@ let topObserver = null; // 顶部 Intersection Observer 实例
 let bottomObserver = null; // 底部 Intersection Observer 实例
 
 const isWaitingForChunk = computed(
-  () => isStreaming.value && typingBuffer.value.length === 0,
+  () =>
+    isWaitingResponse.value ||
+    (isStreaming.value && typingBuffer.value.length === 0),
 ); // 是否在等待下一段流式响应
 
 // 会话提升状态
@@ -143,6 +146,9 @@ function NewSSE(sessionId) {
       lastReceivedChunkId = id;
     },
     onChunk(rawData) {
+      // 收到第一个chunk，清除等待状态
+      isWaitingResponse.value = false;
+
       let chunk = JSON.parse(rawData);
 
       if (typeof chunk !== "string") chunk = String(chunk);
@@ -170,6 +176,7 @@ function NewSSE(sessionId) {
 
       // 关闭流状态
       isStreaming.value = false;
+      isWaitingResponse.value = false;
       // 流式结束，清除本地缓存
       messageCache.remove(sessionId);
     },
@@ -179,6 +186,9 @@ function NewSSE(sessionId) {
         sessionSseHandle = null;
       }
       isStreaming.value = false;
+      isWaitingResponse.value = false;
+      // 发生错误时也清除缓存
+      messageCache.remove(sessionId);
       if (typingTimer) {
         clearTimeout(typingTimer);
         typingTimer = null;
@@ -199,9 +209,29 @@ function subscribeToSession(sessionId, sessionCache) {
   // 解析缓存数据
   let cachedContent = "";
   let lastChunkId = null;
+  let cachedWaitingState = false;
   if (sessionCache) {
     cachedContent = sessionCache.content || "";
     lastChunkId = sessionCache.lastChunkId || null;
+    cachedWaitingState = sessionCache.isWaitingResponse || false;
+
+    // 恢复等待状态（用户消息已经通过 loadChat 加载了，不需要从缓存恢复）
+    if (cachedWaitingState) {
+      isWaitingResponse.value = true;
+      isStreaming.value = true; // 设置为流式状态，以便显示停止按钮
+
+      // 立即创建 AI 消息气泡以显示省略号
+      currentMessages.value.push({
+        senderType: "AI",
+        content: cachedContent,
+        stopped: false,
+      });
+      activeAssistantMessage.value =
+        currentMessages.value[currentMessages.value.length - 1];
+      cacheApplied = true;
+
+      nextTick(() => scrollToBottom());
+    }
   }
 
   const newHandle = chatAPI.subscribeChatStream({
@@ -221,6 +251,9 @@ function subscribeToSession(sessionId, sessionCache) {
     },
     onChunk(rawData) {
       if (sessionSseArchived) return;
+
+      // 收到第一个chunk，清除等待状态
+      isWaitingResponse.value = false;
 
       let chunk = JSON.parse(rawData);
 
@@ -257,6 +290,7 @@ function subscribeToSession(sessionId, sessionCache) {
 
       // 关闭流状态
       isStreaming.value = false;
+      isWaitingResponse.value = false;
       // 流式结束，清除本地缓存
       messageCache.remove(sessionId);
     },
@@ -266,6 +300,9 @@ function subscribeToSession(sessionId, sessionCache) {
         sessionSseHandle = null;
       }
       isStreaming.value = false;
+      isWaitingResponse.value = false;
+      // 发生错误时也清除缓存
+      messageCache.remove(sessionId);
       if (typingTimer) {
         clearTimeout(typingTimer);
         typingTimer = null;
@@ -428,7 +465,7 @@ async function startStream(data) {
   const prompt = data.trim();
   if (!prompt) return;
 
-  // 新建会话时，直接创建真实会话并发送消息，不在本地先渲染临时气泡
+  // 新建会话时，先创建会话，发送消息并保存缓存，然后通知父组件切换
   if (props.chatId === "0") {
     isStreaming.value = true;
     userInput.value = "";
@@ -447,13 +484,22 @@ async function startStream(data) {
       const res = await chatAPI.postCreateSession(title);
       const newId = res.data;
 
+      // 发送消息
       await chatAPI.postMessage({
         message: prompt,
         sessionId: newId,
         mode: mode.value ? ChatMode.Online : ChatMode.Local,
       });
 
-      // 通知父组件切换到真实会话；切换后再由新会话负责流式渲染
+      // 立即将等待响应状态保存到缓存（用户消息已归档，不需要缓存）
+      messageCache.save(
+        newId,
+        "", // AI 消息内容为空
+        null, // lastChunkId 为空
+        true, // 等待响应状态
+      );
+
+      // 通知父组件切换到真实会话；切换后 watch 会触发并从缓存恢复状态
       emit("chat-created", { id: newId, title });
     } catch (error) {
       console.error("创建会话并发送消息失败:", error);
@@ -499,6 +545,9 @@ async function startStream(data) {
 
   let sid = props.chatId ?? 0;
 
+  // 设置等待响应状态
+  isWaitingResponse.value = true;
+
   try {
     // 发送消息
     await chatAPI.postMessage({
@@ -513,6 +562,7 @@ async function startStream(data) {
   } catch (err) {
     // startChat 或 subscribeChatStream 出错
     isStreaming.value = false;
+    isWaitingResponse.value = false;
     if (!typingBuffer.value.length && typingTimer) {
       clearTimeout(typingTimer);
       typingTimer = null;
@@ -528,6 +578,12 @@ function stopStream() {
     .patchStopMessage(props.chatId)
     .catch((err) => console.error("停止对话失败:", err));
   isStreaming.value = false;
+  isWaitingResponse.value = false;
+
+  // 清除缓存，避免切换页面后恢复等待状态
+  if (props.chatId) {
+    messageCache.remove(props.chatId);
+  }
 
   typingBuffer.value = "";
   if (typingTimer) {
@@ -622,10 +678,16 @@ function initIntersectionObservers() {
 
 // 计算并保存当前流式缓存到本地
 function saveStreamCache() {
-  if (props.chatId && isStreaming.value && activeAssistantMessage.value) {
-    const fullContent =
-      activeAssistantMessage.value.content + typingBuffer.value;
-    messageCache.save(props.chatId, fullContent, lastReceivedChunkId);
+  if (props.chatId && (isStreaming.value || isWaitingResponse.value)) {
+    const fullContent = activeAssistantMessage.value
+      ? activeAssistantMessage.value.content + typingBuffer.value
+      : "";
+    messageCache.save(
+      props.chatId,
+      fullContent,
+      lastReceivedChunkId,
+      isWaitingResponse.value,
+    );
   }
 }
 
@@ -687,14 +749,21 @@ watch(
     if (sessionSseHandle) {
       closeSse();
       // 完整内容 = 已渲染 + 打字机缓冲区
-      if (activeAssistantMessage.value) {
-        const fullContent =
-          activeAssistantMessage.value.content + typingBuffer.value;
-        messageCache.save(oldId, fullContent, lastReceivedChunkId);
+      if (activeAssistantMessage.value || isWaitingResponse.value) {
+        const fullContent = activeAssistantMessage.value
+          ? activeAssistantMessage.value.content + typingBuffer.value
+          : "";
+        messageCache.save(
+          oldId,
+          fullContent,
+          lastReceivedChunkId,
+          isWaitingResponse.value,
+        );
       }
     }
     // 清理所有状态
     isStreaming.value = false;
+    isWaitingResponse.value = false;
     typingBuffer.value = "";
     activeAssistantMessage.value = null;
     lastReceivedChunkId = null;
