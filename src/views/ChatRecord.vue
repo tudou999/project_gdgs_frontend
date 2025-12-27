@@ -64,10 +64,8 @@ let topObserver = null; // 顶部 Intersection Observer 实例
 let bottomObserver = null; // 底部 Intersection Observer 实例
 
 const isWaitingForChunk = computed(
-  () =>
-    isWaitingResponse.value ||
-    (isStreaming.value && typingBuffer.value.length === 0),
-); // 是否在等待下一段流式响应
+  () => isWaitingResponse.value
+); // 是否在等待响应（只在发送消息后到收到第一个chunk之前显示省略号）
 
 // 会话提升状态
 const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提升到真实会话
@@ -716,7 +714,10 @@ onMounted(() => {
   if (savedMode !== null) mode.value = savedMode === "true"; // localStorage 存储的是字符串
 
   // 监听浏览器刷新/关闭/跳转事件
-  window.addEventListener("beforeunload", () => saveStreamCache());
+  window.addEventListener("beforeunload", () => {
+    saveStreamCache();
+    localStorage.setItem("chatMode", String(mode.value));
+  });
 
   // 初始化 Intersection Observer
   nextTick(() => {
@@ -731,11 +732,6 @@ watch(userInput, () => {
   nextTick(() => {
     adjustTextareaHeight();
   });
-});
-
-// 监听 mode 变化，保存到 localStorage
-watch(mode, (newMode) => {
-  localStorage.setItem("chatMode", String(newMode));
 });
 
 // 监听：当组件接收到的值改变时，根据该值加载对应会话消息
@@ -802,6 +798,9 @@ watch(
 onBeforeUnmount(() => {
   // 卸载前保存当前流式缓存
   saveStreamCache();
+
+  // 保存模式设置到 localStorage
+  localStorage.setItem("chatMode", String(mode.value));
 
   // 清理 Intersection Observer
   cleanupObservers();
