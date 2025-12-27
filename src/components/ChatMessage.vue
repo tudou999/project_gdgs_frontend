@@ -27,7 +27,9 @@
         </div>
         <div class="text markdown-content" ref="contentRef" v-else>
           <span class="markdown-body" v-html="processedContent"></span>
-          <span v-if="showWaitingIndicator" class="waiting-ellipsis">...</span>
+          <span v-if="showWaitingIndicator" class="waiting-ellipsis"
+            ><el-icon><MoreFilled /></el-icon
+          ></span>
         </div>
       </div>
       <div v-if="!isUser && message.stopped" class="message-status stopped">
@@ -60,6 +62,7 @@ import {
 } from "@heroicons/vue/24/outline";
 import hljs from "highlight.js";
 import "highlight.js/styles/github-dark.css";
+import { MoreFilled } from "@element-plus/icons-vue";
 const props = defineProps({
   message: {
     type: Object,
@@ -266,11 +269,8 @@ const copyToClipboard = async (text) => {
   textArea.select();
 
   try {
-    const successful = document.execCommand("copy");
+    document.execCommand("copy");
     document.body.removeChild(textArea);
-    if (!successful) {
-      throw new Error("Copy command failed");
-    }
   } catch (err) {
     document.body.removeChild(textArea);
     throw err;
@@ -493,6 +493,21 @@ const formatTime = (timestamp) => {
 
       .markdown-body {
         display: inline;
+
+        // 确保最后一个段落不会导致省略号换行
+        :deep(p:last-child) {
+          margin-bottom: 0;
+          display: inline;
+        }
+
+        // 如果最后是其他块级元素（除了代码块、引用等），也设为内联
+        :deep(
+          > *:last-child:not(pre):not(blockquote):not(table):not(ul):not(
+              ol
+            ):not(.code-block-wrapper):not(.think-block)
+        ) {
+          display: inline;
+        }
       }
 
       .cursor {
@@ -513,6 +528,8 @@ const formatTime = (timestamp) => {
         letter-spacing: 0.2rem;
         color: var(--el-text-color-secondary);
         animation: ellipsisPulse 1.2s ease-in-out infinite;
+        vertical-align: baseline;
+        white-space: nowrap;
       }
 
       :deep(.think-block) {

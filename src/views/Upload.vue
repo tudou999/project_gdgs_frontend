@@ -68,14 +68,10 @@ const uploadFile = async (options) => {
     );
     if (res.code === 200) {
       ElMessage.success("上传成功！");
-      if (onSuccess) {
-        onSuccess(res, file);
-      }
+      if (onSuccess) onSuccess(res, file);
     } else {
       ElMessage.error("上传失败：" + (res.msg || "未知错误"));
-      if (onError) {
-        onError(new Error(res.msg || "上传失败"));
-      }
+      if (onError) onError(new Error(res.msg || "上传失败"));
     }
   } catch (error) {
     ElMessage.error("上传异常，请稍后重试");

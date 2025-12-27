@@ -177,10 +177,8 @@ function startNewChat() {
 function focusInput() {
   // 等待下一个 DOM 更新周期后再聚焦
   nextTick(() => {
-    const inputEl = document.querySelector(".ai-chat .el-textarea__inner");
-    if (inputEl) {
-      inputEl.focus();
-    }
+    const inputEl = document.querySelector(".custom-textarea");
+    if (inputEl) inputEl.focus();
   });
 }
 
