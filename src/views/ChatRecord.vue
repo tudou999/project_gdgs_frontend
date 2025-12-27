@@ -74,11 +74,11 @@ let sessionSseHandle = null; // 当前会话的SSE连接句柄，用于监听实
 // 模式（本地/在线）（false表示本地，true表示在线）
 const mode = ref(false);
 
-// 根据缓存长度动态调整打字机速度
-// 使用反比例函数实现平滑的速度调节：缓冲区越长，渲染越快
-// 公式：delay = maxDelay / (1 + bufferLength / factor)
-// - bufferLength = 0 时，delay ≈ 25ms（最慢）
-// - bufferLength 增大时，delay 平滑减小（最快约 5ms）
+/*根据缓存长度动态调整打字机速度
+使用反比例函数实现平滑的速度调节：缓冲区越长，渲染越快
+公式：delay = maxDelay / (1 + bufferLength / factor)
+- bufferLength = 0 时，delay ≈ 25ms（最慢）
+- bufferLength 增大时，delay 平滑减小（最快约 5ms）*/
 function computeTypingDelay(bufferLength) {
   const maxDelay = 25; // 最大延迟（ms），缓冲区为空时的速度
   const minDelay = 5; // 最小延迟（ms），缓冲区很大时的最快速度
@@ -498,26 +498,6 @@ async function startStream(data) {
   await scrollToBottom(true);
 
   let sid = props.chatId ?? 0;
-  // 如果当前是本地临时会话（id=0），则先创建真实会话
-  if (sid === "0") {
-    // 标记为正在提升会话
-    isPromotingFromLocal.value = true;
-
-    try {
-      const title = prompt.slice(0, 12);
-      // 创建真实会话并获取刚创建的 ID
-      const res = await chatAPI.postCreateSession(title);
-      sid = res.data;
-
-      // 通知父组件会话已创建
-      emit("chat-created", { id: sid, title: title });
-    } catch (error) {
-      isPromotingFromLocal.value = false;
-      console.error("创建会话失败:", error);
-      isStreaming.value = false;
-      return;
-    }
-  }
 
   try {
     // 发送消息
@@ -642,7 +622,7 @@ function initIntersectionObservers() {
 
 // 计算并保存当前流式缓存到本地
 function saveStreamCache() {
-  if (props.chatId && isStreaming.value) {
+  if (props.chatId && isStreaming.value && activeAssistantMessage.value) {
     const fullContent =
       activeAssistantMessage.value.content + typingBuffer.value;
     messageCache.save(props.chatId, fullContent, lastReceivedChunkId);
@@ -707,9 +687,11 @@ watch(
     if (sessionSseHandle) {
       closeSse();
       // 完整内容 = 已渲染 + 打字机缓冲区
-      const fullContent =
-        activeAssistantMessage.value.content + typingBuffer.value;
-      messageCache.save(oldId, fullContent, lastReceivedChunkId);
+      if (activeAssistantMessage.value) {
+        const fullContent =
+          activeAssistantMessage.value.content + typingBuffer.value;
+        messageCache.save(oldId, fullContent, lastReceivedChunkId);
+      }
     }
     // 清理所有状态
     isStreaming.value = false;
@@ -735,7 +717,8 @@ watch(
     await runWithSkeleton(loadChat(newId));
 
     // 从本地缓存中读取：content，lastReceivedChunkId
-    const sessionCache = messageCache.get(newId);
+    let sessionCache = null;
+    if (messageCache.has(newId)) sessionCache = messageCache.get(newId);
 
     // 建立当前会话的SSE连接，监听实时消息
     subscribeToSession(newId, sessionCache);
