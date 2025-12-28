@@ -63,9 +63,7 @@ const { skeletonRef: showSkeleton, runWithSkeleton } = useSkeleton();
 let topObserver = null; // 顶部 Intersection Observer 实例
 let bottomObserver = null; // 底部 Intersection Observer 实例
 
-const isWaitingForChunk = computed(
-  () => isWaitingResponse.value
-); // 是否在等待响应（只在发送消息后到收到第一个chunk之前显示省略号）
+const isWaitingForChunk = computed(() => isWaitingResponse.value); // 是否在等待响应（只在发送消息后到收到第一个chunk之前显示省略号）
 
 // 会话提升状态
 const isPromotingFromLocal = ref(false); // 是否正在从本地临时会话提升到真实会话
@@ -707,11 +705,35 @@ const cleanupObservers = () => {
   }
 };
 
+/*输入框滑动/欢迎语相关
+ * */
+const isNewChatView = computed(() => {
+  return props.chatId === "0" || props.chatId == null;
+});
+// 欢迎语数组
+const welcomeMessages = [
+  "您今天在想什么？",
+  "有什么我可以帮您的吗？",
+  "想从哪里开始？",
+  "欢迎回来，需要我做点什么？",
+  "今天有什么想解决的问题？",
+];
+// 选中的欢迎语
+const randomWelcomeMessage = ref("");
+// 生成随机欢迎语的函数
+const generateRandomWelcome = () => {
+  const randomIndex = Math.floor(Math.random() * welcomeMessages.length);
+  randomWelcomeMessage.value = welcomeMessages[randomIndex];
+};
+
 // 组件挂载
 onMounted(() => {
   // 从 localStorage 读取保存的模式
   const savedMode = localStorage.getItem("chatMode");
   if (savedMode !== null) mode.value = savedMode === "true"; // localStorage 存储的是字符串
+
+  // 生成随机欢迎语
+  generateRandomWelcome();
 
   // 监听浏览器刷新/关闭/跳转事件
   window.addEventListener("beforeunload", () => {
@@ -776,8 +798,11 @@ watch(
     }
 
     // 进入
-    // 如果进入新对话窗口，return
-    if (newId === "0" || newId == null) return;
+    // 如果进入新对话窗口，生成新的随机欢迎语并return
+    if (newId === "0" || newId == null) {
+      generateRandomWelcome();
+      return;
+    }
 
     await runWithSkeleton(loadChat(newId));
 
@@ -823,7 +848,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="chat-record">
+  <div class="chat-record" :class="{ 'is-new-chat': isNewChatView }">
     <div class="messages" ref="messagesRef">
       <!-- 顶部哨兵元素：用于检测是否滚动到顶部，触发加载更多 -->
       <div ref="topSentinelRef" class="sentinel"></div>
@@ -867,6 +892,10 @@ onBeforeUnmount(() => {
     </div>
     <div class="input-area">
       <div class="input-wrapper">
+        <!-- 新对话时显示的提示文字 -->
+        <div v-if="isNewChatView" class="welcome-text">
+          {{ randomWelcomeMessage }}
+        </div>
         <div class="input-row">
           <!-- TODO：暂时修改死宽度，后面要优化 -->
           <div class="textarea-wrapper" style="max-width: 685px">
@@ -924,6 +953,19 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+.chat-record.is-new-chat {
+  .messages {
+    /* 新对话时弱化消息区存在感 */
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .input-area {
+    /* 向上平移到视觉中心 */
+    transform: translateY(-40vh);
+    padding-bottom: 0;
+  }
 }
 
 .messages {
@@ -991,6 +1033,11 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
 
+  /* 动画关键 */
+  transition:
+    transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+
   .input-wrapper {
     width: 100%;
     max-width: 900px;
@@ -998,6 +1045,26 @@ onBeforeUnmount(() => {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+
+    .welcome-text {
+      text-align: center;
+      font-size: 1.75rem;
+      color: var(--el-text-color-primary);
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeIn 0.6s ease-in-out 0.2s forwards;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
   }
 
   .input-row {
