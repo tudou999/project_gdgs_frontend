@@ -258,6 +258,8 @@ const clickInfoButton = async (id: string) => {
   }
 };
 
+/*上传/更新文件信息相关
+ * */
 // 上传文件信息表单数据
 const uploadInfoForm = ref<FileUploadInfo | null>(null);
 // 是否显示上传文件信息对话框
@@ -268,7 +270,6 @@ const currentFileId = ref<string>("");
 const currentOperation = ref<"upload" | "update">("upload");
 // 是否正在加载文件信息
 const isLoadingFileInfo = ref<boolean>(false);
-
 // 打开上传文件信息弹窗
 const openUploadInfoDialog = async (
   id: string,
@@ -280,7 +281,6 @@ const openUploadInfoDialog = async (
   if (operation === "update") {
     // 更新操作：先加载现有信息
     isLoadingFileInfo.value = true;
-    uploadInfoDialogVisible.value = true;
 
     try {
       const res = await fileAPI.getInformation(id);
@@ -299,6 +299,7 @@ const openUploadInfoDialog = async (
         ElMessage.error("获取信息失败：" + res.msg);
         uploadInfoDialogVisible.value = false;
       }
+      uploadInfoDialogVisible.value = true;
     } catch (error) {
       console.error("获取信息失败:", error);
       ElMessage.warning("获取信息失败！请联系管理员");
@@ -320,7 +321,6 @@ const openUploadInfoDialog = async (
     uploadInfoDialogVisible.value = true;
   }
 };
-
 // 提交上传/更新文件信息
 const submitUploadInfo = async (): Promise<void> => {
   if (!uploadInfoForm.value!.projectName) {
@@ -332,7 +332,7 @@ const submitUploadInfo = async (): Promise<void> => {
     let res;
     if (currentOperation.value === "update") {
       // 调用更新接口
-      res = await fileAPI.postUpdateFileInfo(
+      res = await fileAPI.putUpdateFileInfo(
         currentFileId.value,
         uploadInfoForm.value!,
       );
@@ -370,28 +370,9 @@ const submitUploadInfo = async (): Promise<void> => {
     );
   }
 };
-// 提交更新文件信息
-const submitUpdateFileInfo = async (): Promise<void> => {
-  if (!uploadInfoForm.value!.projectName) {
-    ElMessage.warning("请输入项目名称");
-    return;
-  }
 
-  try {
-    const res = await fileAPI.putUpdateFileInfo(
-      currentFileId.value,
-      uploadInfoForm.value!,
-    );
-    if (res.code === 200) {
-      ElMessage.success("文件信息更新成功！");
-      uploadInfoDialogVisible.value = false;
-    } else ElMessage.error("更新失败：" + (res.msg || "未知错误"));
-  } catch (error) {
-    console.error("更新文件信息失败:", error);
-    ElMessage.warning("更新失败！请联系管理员");
-  }
-};
-
+/*创建/重命名文件夹相关
+ * */
 // 创建文件夹
 const createFolder = async (
   parentId: string | null,
@@ -412,7 +393,6 @@ const createFolder = async (
     isRenaming.value = false;
   }
 };
-
 // 重命名文件夹
 const renameFF = async (myId: string, newName: string): Promise<void> => {
   try {
@@ -430,7 +410,6 @@ const renameFF = async (myId: string, newName: string): Promise<void> => {
     renamingId.value = "";
   }
 };
-
 // 判断打钩执行的是新建还是重命名
 const checkOrRename = async (
   editing: editingType,
@@ -442,7 +421,6 @@ const checkOrRename = async (
   if (editing === 1) await createFolder(fatherId, newName);
   else if (editing === 2) await renameFF(myId, newName);
 };
-
 // 判断确认按钮是否应该显示 loading 状态
 const isConfirmButtonLoading = (
   file: FileRawInfoType | FolderTempInfoType,
@@ -460,7 +438,6 @@ const isConfirmButtonLoading = (
 
   return false;
 };
-
 // 判断确认按钮是否应该被禁用
 const isConfirmButtonDisabled = (
   file: FileRawInfoType | FolderTempInfoType,
@@ -479,7 +456,6 @@ const isConfirmButtonDisabled = (
   // 其他情况不禁用
   return false;
 };
-
 // 取消编辑操作（取消新建文件夹或重命名）
 const cancelEdit = async () => {
   // 清空所有状态
@@ -489,7 +465,11 @@ const cancelEdit = async () => {
   await reloadContent();
 };
 
+/*删除文件相关
+ * */
+// 是否显示删除确认弹窗
 const deleteConfirmVisible = ref(false);
+// 删除的目标文件 ID
 const deleteTargetId = ref<string | null>(null);
 // 删除文件
 const deleteFile = async (id: string) => {
@@ -507,13 +487,14 @@ const deleteFile = async (id: string) => {
   }
 };
 
+/*移动文件相关
+ */
 // 要移动的文件对象
 const moveSourceFile = ref<FileRawInfoType | null>(null);
 // 目标文件夹 ID
 const moveTargetFolderId = ref<string>("");
 // 是否显示移动文件对话框
 const moveDialogVisible = ref(false);
-
 // 打开移动文件对话框
 const openMoveDialog = (file: FileRawInfoType): void => {
   if (!file || file.folder) return;
@@ -549,7 +530,6 @@ const loadFolderTree = async (node: any, resolve: any): Promise<void> => {
     resolve([]);
   }
 };
-
 // 确认移动文件
 const confirmMove = async () => {
   if (!moveSourceFile.value || moveTargetFolderId.value == null) {
@@ -577,6 +557,8 @@ const confirmMove = async () => {
   }
 };
 
+/*拖拽移动文件相关
+ */
 // 当前正在被拖拽的文件 ID
 const draggingFileId = ref<string>("");
 // 当前拖拽悬停的文件夹 ID
@@ -589,24 +571,20 @@ const onFileDragStart = (file: FileRawInfoType) => {
     draggingFileId.value = "";
   }
 };
-
 // 拖拽经过文件夹（主要用于配合 .prevent）
 const onFolderDragOver = () => {};
-
 // 拖拽进入文件夹：设置高亮
 const onFolderDragEnter = (targetFolder: FileRawInfoType) => {
   if (targetFolder && targetFolder.folder) {
     hoverFolderId.value = targetFolder.id;
   }
 };
-
 // 拖拽离开文件夹：取消高亮
 const onFolderDragLeave = (targetFolder: FileRawInfoType) => {
   if (hoverFolderId.value === targetFolder.id) {
     hoverFolderId.value = "";
   }
 };
-
 // 在文件夹上放下文件：调用移动接口
 const onFolderDrop = async (targetFolder: FileRawInfoType) => {
   if (!draggingFileId.value) return;
@@ -632,6 +610,8 @@ const onFolderDrop = async (targetFolder: FileRawInfoType) => {
   }
 };
 
+/*下载文件相关
+ * */
 // 是否正在下载文件
 const isDownloading = ref<boolean>(false);
 // 下载进度百分比

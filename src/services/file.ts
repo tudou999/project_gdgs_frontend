@@ -99,7 +99,7 @@ export const fileAPI = {
 
   // 更新文件信息
   putUpdateFileInfo(fileMetadataId: string, info: FileUploadInfo) {
-    return apiClient.put(`${FILE_API_BASE_URL}/${fileMetadataId}/info`, {
+    return apiClient.put(`${FILE_API_BASE_URL}/info`, {
       fileMetadataId: fileMetadataId,
       projectName: info.projectName,
       projectStartDate: info.projectStartDate,
