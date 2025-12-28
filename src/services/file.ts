@@ -69,6 +69,20 @@ export const fileAPI = {
     });
   },
 
+  // 更新文件
+  postUpdateFile(
+    id: string,
+    file: FormData,
+    onProgress?: (event: AxiosProgressEvent) => void,
+  ) {
+    return rawApiClient.post(`${FILE_API_BASE_URL}/update`, file, {
+      params: {
+        id: id,
+      },
+      onUploadProgress: onProgress,
+    });
+  },
+
   // 上传文件信息
   postUploadFileInfo(fileMetadataId: string, info: FileUploadInfo) {
     return apiClient.post(`${FILE_API_BASE_URL}/info`, {
@@ -78,7 +92,21 @@ export const fileAPI = {
       projectDuration: info.projectDuration,
       projectManager: info.projectManager,
       projectManagerSecond: info.projectManagerSecond,
-      projectLocation: info.projectCity,
+      projectLocation: info.projectLocation,
+      projectPartner: info.projectPartner,
+    });
+  },
+
+  // 更新文件信息
+  putUpdateFileInfo(fileMetadataId: string, info: FileUploadInfo) {
+    return apiClient.put(`${FILE_API_BASE_URL}/${fileMetadataId}/info`, {
+      fileMetadataId: fileMetadataId,
+      projectName: info.projectName,
+      projectStartDate: info.projectStartDate,
+      projectDuration: info.projectDuration,
+      projectManager: info.projectManager,
+      projectManagerSecond: info.projectManagerSecond,
+      projectLocation: info.projectLocation,
       projectPartner: info.projectPartner,
     });
   },

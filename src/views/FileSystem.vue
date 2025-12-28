@@ -264,22 +264,64 @@ const uploadInfoForm = ref<FileUploadInfo | null>(null);
 const uploadInfoDialogVisible = ref<boolean>(false);
 // 当前上传文件的 ID
 const currentFileId = ref<string>("");
+// 当前操作类型：'upload' 或 'update'
+const currentOperation = ref<"upload" | "update">("upload");
+// 是否正在加载文件信息
+const isLoadingFileInfo = ref<boolean>(false);
+
 // 打开上传文件信息弹窗
-const openUploadInfoDialog = (id: string): void => {
+const openUploadInfoDialog = async (
+  id: string,
+  operation: "upload" | "update" = "upload",
+): Promise<void> => {
   currentFileId.value = id;
-  // 重置表单
-  uploadInfoForm.value = {
-    projectName: "",
-    projectStartDate: null,
-    projectDuration: 0,
-    projectManager: "",
-    projectManagerSecond: "",
-    projectCity: "",
-    projectPartner: "",
-  };
-  uploadInfoDialogVisible.value = true;
+  currentOperation.value = operation;
+
+  if (operation === "update") {
+    // 更新操作：先加载现有信息
+    isLoadingFileInfo.value = true;
+    uploadInfoDialogVisible.value = true;
+
+    try {
+      const res = await fileAPI.getInformation(id);
+      if (res.code === 200) {
+        // 填充现有信息到表单
+        uploadInfoForm.value = {
+          projectName: res.data.projectName || "",
+          projectStartDate: res.data.projectStartDate || null,
+          projectDuration: res.data.projectDuration || 0,
+          projectManager: res.data.projectManager || "",
+          projectManagerSecond: res.data.projectManagerSecond || "",
+          projectLocation: res.data.projectLocation || "",
+          projectPartner: res.data.projectPartner || "",
+        };
+      } else {
+        ElMessage.error("获取信息失败：" + res.msg);
+        uploadInfoDialogVisible.value = false;
+      }
+    } catch (error) {
+      console.error("获取信息失败:", error);
+      ElMessage.warning("获取信息失败！请联系管理员");
+      uploadInfoDialogVisible.value = false;
+    } finally {
+      isLoadingFileInfo.value = false;
+    }
+  } else {
+    // 上传操作：重置表单
+    uploadInfoForm.value = {
+      projectName: "",
+      projectStartDate: null,
+      projectDuration: 0,
+      projectManager: "",
+      projectManagerSecond: "",
+      projectLocation: "",
+      projectPartner: "",
+    };
+    uploadInfoDialogVisible.value = true;
+  }
 };
-// 提交上传文件信息
+
+// 提交上传/更新文件信息
 const submitUploadInfo = async (): Promise<void> => {
   if (!uploadInfoForm.value!.projectName) {
     ElMessage.warning("请输入项目名称");
@@ -287,19 +329,66 @@ const submitUploadInfo = async (): Promise<void> => {
   }
 
   try {
-    const res = await fileAPI.postUploadFileInfo(
+    let res;
+    if (currentOperation.value === "update") {
+      // 调用更新接口
+      res = await fileAPI.postUpdateFileInfo(
+        currentFileId.value,
+        uploadInfoForm.value!,
+      );
+    } else {
+      // 调用上传接口
+      res = await fileAPI.postUploadFileInfo(
+        currentFileId.value,
+        uploadInfoForm.value!,
+      );
+    }
+
+    if (res.code === 200) {
+      ElMessage.success(
+        currentOperation.value === "update"
+          ? "文件信息更新成功！"
+          : "文件信息上传成功！",
+      );
+      uploadInfoDialogVisible.value = false;
+      await reloadContent();
+    } else {
+      ElMessage.error(
+        (currentOperation.value === "update" ? "更新" : "上传") +
+          "失败：" +
+          (res.msg || "未知错误"),
+      );
+    }
+  } catch (error) {
+    console.error(
+      (currentOperation.value === "update" ? "更新" : "上传") + "文件信息失败:",
+      error,
+    );
+    ElMessage.warning(
+      (currentOperation.value === "update" ? "更新" : "上传") +
+        "失败！请联系管理员",
+    );
+  }
+};
+// 提交更新文件信息
+const submitUpdateFileInfo = async (): Promise<void> => {
+  if (!uploadInfoForm.value!.projectName) {
+    ElMessage.warning("请输入项目名称");
+    return;
+  }
+
+  try {
+    const res = await fileAPI.putUpdateFileInfo(
       currentFileId.value,
       uploadInfoForm.value!,
     );
     if (res.code === 200) {
-      ElMessage.success("文件信息上传成功！");
+      ElMessage.success("文件信息更新成功！");
       uploadInfoDialogVisible.value = false;
-    } else {
-      ElMessage.error("上传失败：" + (res.msg || "未知错误"));
-    }
+    } else ElMessage.error("更新失败：" + (res.msg || "未知错误"));
   } catch (error) {
-    console.error("上传文件信息失败:", error);
-    ElMessage.warning("上传失败！请联系管理员");
+    console.error("更新文件信息失败:", error);
+    ElMessage.warning("更新失败！请联系管理员");
   }
 };
 
@@ -601,11 +690,88 @@ const gotoUpload = () => {
     },
   });
 };
+
+/*更新文件相关
+ * */
+const chooseId = ref<string | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+// 是否正在上传文件
+const isUploading = ref<boolean>(false);
+// 上传进度百分比
+const uploadPercent = ref<number>(0);
+// 正在上传的文件名
+const uploadingFileName = ref<string>("");
+// 打开文件选择器
+const openFileChooser = (id: string) => {
+  chooseId.value = id;
+  fileInput.value?.click();
+};
+// 处理选中的文件
+const handleFileChange = async (e: Event) => {
+  const files = (e.target as HTMLInputElement).files;
+  if (!files || files.length === 0) return;
+
+  const selectedFile = files[0];
+
+  // 设置上传状态
+  isUploading.value = true;
+  uploadPercent.value = 0;
+  uploadingFileName.value = selectedFile.name;
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+
+  try {
+    const res = await fileAPI.postUpdateFile(
+      chooseId.value!,
+      formData,
+      (progressEvent: AxiosProgressEvent) => {
+        if (progressEvent.total) {
+          uploadPercent.value = Number(
+            ((progressEvent.loaded / progressEvent.total) * 100).toFixed(2),
+          );
+        }
+      },
+    );
+
+    if (res.code === 200) await reloadContent();
+    else ElMessage.error("文件更新失败！");
+  } catch (error) {
+    console.error("文件更新失败:", error);
+    ElMessage.error("文件更新失败！请联系管理员");
+  } finally {
+    // 清空选择的文件，允许下次选择同一个文件
+    if (fileInput.value) fileInput.value.value = "";
+    chooseId.value = null;
+    isUploading.value = false;
+    uploadPercent.value = 0;
+    uploadingFileName.value = "";
+  }
+};
 </script>
 
 <template>
   <el-container>
+    <input
+      ref="fileInput"
+      type="file"
+      style="display: none"
+      @change="handleFileChange"
+      :multiple="false"
+    />
     <el-main style="margin: 0 400px">
+      <!-- 上传进度条 -->
+      <div v-if="isUploading" class="upload-progress-fixed">
+        <div style="margin-bottom: 10px">
+          正在上传文件：{{ uploadingFileName || "未知文件" }}
+        </div>
+        <el-progress
+          :percentage="uploadPercent"
+          :stroke-width="12"
+          style="margin-bottom: 5px"
+        />
+      </div>
+
       <!-- 下载进度条 -->
       <div v-if="isDownloading" class="download-progress-fixed">
         <div style="margin-bottom: 10px">
@@ -723,15 +889,27 @@ const gotoUpload = () => {
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
+                <!-- 文件已上传信息时显示：更新和查看 -->
+                <template v-if="!file.folder && file.association">
+                  <el-dropdown-item
+                    @click="openUploadInfoDialog(file.id, 'update')"
+                    >更新文件信息</el-dropdown-item
+                  >
+                  <el-dropdown-item @click="clickInfoButton(file.id)"
+                    >查看文件信息</el-dropdown-item
+                  >
+                </template>
+                <!-- 文件未上传信息时显示：上传 -->
                 <el-dropdown-item
-                  @click="openUploadInfoDialog(file.id)"
-                  v-if="!file.folder"
+                  v-if="!file.folder && !file.association"
+                  @click="openUploadInfoDialog(file.id, 'upload')"
                   >上传文件信息</el-dropdown-item
                 >
+
                 <el-dropdown-item
-                  @click="clickInfoButton(file.id)"
+                  @click="openFileChooser(file.id)"
                   v-if="!file.folder"
-                  >查看文件信息</el-dropdown-item
+                  >更新文件</el-dropdown-item
                 >
                 <el-dropdown-item
                   @click="downloadFile(file.id, file.name)"
@@ -776,13 +954,18 @@ const gotoUpload = () => {
         </div>
       </div>
 
-      <!-- 上传文件信息弹窗 -->
+      <!-- 上传/更新文件信息弹窗 -->
       <el-dialog
         v-model="uploadInfoDialogVisible"
-        title="上传文件信息"
+        :title="currentOperation === 'update' ? '更新文件信息' : '上传文件信息'"
         width="600px"
       >
-        <el-form :model="uploadInfoForm" label-width="120px">
+        <el-form
+          :model="uploadInfoForm"
+          label-width="120px"
+          v-loading="isLoadingFileInfo"
+          element-loading-text="正在加载文件信息..."
+        >
           <el-form-item required label="项目名称">
             <el-input v-model="uploadInfoForm!.projectName" />
           </el-form-item>
@@ -808,7 +991,7 @@ const gotoUpload = () => {
             <el-input v-model="uploadInfoForm!.projectManagerSecond" />
           </el-form-item>
           <el-form-item label="项目实施位置">
-            <el-input v-model="uploadInfoForm!.projectCity" />
+            <el-input v-model="uploadInfoForm!.projectLocation" />
           </el-form-item>
           <el-form-item label="项目乙方单位">
             <el-input v-model="uploadInfoForm!.projectPartner" />
@@ -817,8 +1000,12 @@ const gotoUpload = () => {
         <template #footer>
           <span class="dialog-footer">
             <el-button @click="uploadInfoDialogVisible = false">取消</el-button>
-            <el-button type="primary" @click="submitUploadInfo">
-              确定上传
+            <el-button
+              type="primary"
+              @click="submitUploadInfo"
+              :disabled="isLoadingFileInfo"
+            >
+              {{ currentOperation === "update" ? "确定更新" : "确定上传" }}
             </el-button>
           </span>
         </template>
@@ -847,7 +1034,7 @@ const gotoUpload = () => {
             <span>{{ fileInfo!.projectManagerSecond || "-" }}</span>
           </el-form-item>
           <el-form-item label="项目实施位置">
-            <span>{{ fileInfo!.projectCity || "-" }}</span>
+            <span>{{ fileInfo!.projectLocation || "-" }}</span>
           </el-form-item>
           <el-form-item label="项目乙方单位">
             <span>{{ fileInfo!.projectPartner || "-" }}</span>
@@ -1091,6 +1278,26 @@ const gotoUpload = () => {
   position: fixed;
   left: 16px;
   bottom: 16px;
+  width: 400px;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.65);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 2000;
+
+  :deep(.el-progress-bar__outer) {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+
+  :deep(.el-progress__text) {
+    color: #fff;
+  }
+}
+
+.upload-progress-fixed {
+  position: fixed;
+  left: 16px;
+  bottom: 80px;
   width: 400px;
   padding: 8px 12px;
   background-color: rgba(0, 0, 0, 0.65);

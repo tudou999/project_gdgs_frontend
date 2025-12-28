@@ -5,7 +5,7 @@ export interface FileUploadInfo {
   projectDuration: number;
   projectManager: string;
   projectManagerSecond: string;
-  projectCity: string;
+  projectLocation: string;
   projectPartner: string;
 }
 
@@ -37,6 +37,7 @@ export interface FileRawInfoType {
   created: Date;
   updated: Date;
   editing?: editingType;
+  association?: boolean; // 标识文件是否已上传信息
 }
 
 // 面包屑元素接口

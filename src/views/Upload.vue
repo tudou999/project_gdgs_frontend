@@ -13,13 +13,7 @@
 
     <!-- 上传组件 -->
     <div style="display: flex; justify-content: center">
-      <el-upload
-        style="width: 50%"
-        drag
-        action=""
-        :http-request="uploadFile"
-        multiple
-      >
+      <el-upload style="width: 50%" drag action="" :http-request="uploadFile">
         <!-- 上传图标及操作提示 -->
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">
