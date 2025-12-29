@@ -22,7 +22,7 @@
 
         <!-- 文件大小提示 -->
         <template #tip>
-          <div class="el-upload__tip">文件大小在100MB内</div>
+          <div class="el-upload__tip">文件大小在1000MB内</div>
         </template>
       </el-upload>
     </div>

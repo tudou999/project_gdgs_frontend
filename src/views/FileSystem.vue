@@ -723,6 +723,9 @@ const handleFileChange = async (e: Event) => {
     // 清空选择的文件，允许下次选择同一个文件
     if (fileInput.value) fileInput.value.value = "";
     chooseId.value = null;
+    setTimeout(() => {
+      isUploading.value = false;
+    }, 1500);
     isUploading.value = false;
     uploadPercent.value = 0;
     uploadingFileName.value = "";
