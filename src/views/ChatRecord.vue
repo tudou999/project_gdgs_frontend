@@ -1,6 +1,5 @@
 <script setup>
 // TODO：UI界面优化
-// TODO：将缓存信息存到 IndexedDB，避免 localStorage 容量限制问题
 // TODO：切换对话的时候停止按钮还是显示停止，排查bug
 // TODO：刷新记忆是在线还是本地
 import {
@@ -17,7 +16,7 @@ import { chatAPI } from "../services/sessions.js";
 import IconStop from "../components/icons/IconStop.vue";
 import { ElMessage } from "element-plus";
 import { ChatMode } from "../interface/Tchat.ts";
-import { messageCache } from "../utils/UtilMessageCache.ts";
+import { messageCache } from "../utils/UtilMessageCacheDB.ts";
 import { useSkeleton } from "../utils/UtilShowSkeleton.ts";
 
 defineOptions({
@@ -198,7 +197,7 @@ function NewSSE(sessionId) {
 }
 
 // 建立当前会话的SSE连接，监听实时消息
-function subscribeToSession(sessionId, sessionCache) {
+async function subscribeToSession(sessionId, sessionCache) {
   let sessionSseArchived = false;
   let cacheApplied = false;
 
@@ -237,7 +236,7 @@ function subscribeToSession(sessionId, sessionCache) {
       if (id === "ARCHIVE_FINISHED") {
         sessionSseArchived = true;
         isStreaming.value = false;
-        messageCache.remove(sessionId);
+        messageCache.remove(sessionId).catch(err => console.error("清除缓存失败", err));
         newHandle.cancel();
         sessionSseHandle = null;
       } else {
@@ -488,7 +487,7 @@ async function startStream(data) {
       });
 
       // 立即将等待响应状态保存到缓存（用户消息已归档，不需要缓存）
-      messageCache.save(
+      await messageCache.save(
         newId,
         "", // AI 消息内容为空
         null, // lastChunkId 为空
@@ -552,7 +551,7 @@ async function startStream(data) {
       mode: mode.value ? ChatMode.Online : ChatMode.Local,
     });
     // 清除本地缓存
-    messageCache.remove(sid);
+    await messageCache.remove(sid);
     // 订阅sse
     NewSSE(sid, null);
   } catch (err) {
@@ -578,7 +577,7 @@ function stopStream() {
 
   // 清除缓存，避免切换页面后恢复等待状态
   if (props.chatId) {
-    messageCache.remove(props.chatId);
+    messageCache.remove(props.chatId).catch(err => console.error("清除缓存失败", err));
   }
 
   typingBuffer.value = "";
@@ -673,12 +672,12 @@ function initIntersectionObservers() {
 }
 
 // 计算并保存当前流式缓存到本地
-function saveStreamCache() {
+async function saveStreamCache() {
   if (props.chatId && (isStreaming.value || isWaitingResponse.value)) {
     const fullContent = activeAssistantMessage.value
       ? activeAssistantMessage.value.content + typingBuffer.value
       : "";
-    messageCache.save(
+    await messageCache.save(
       props.chatId,
       fullContent,
       lastReceivedChunkId,
@@ -737,7 +736,8 @@ onMounted(() => {
 
   // 监听浏览器刷新/关闭/跳转事件
   window.addEventListener("beforeunload", () => {
-    saveStreamCache();
+    // 使用 sendBeacon 或同步方式保存缓存（beforeunload 中异步操作可能不会完成）
+    saveStreamCache().catch(err => console.error("保存缓存失败", err));
     localStorage.setItem("chatMode", String(mode.value));
   });
 
@@ -776,7 +776,7 @@ watch(
           fullContent,
           lastReceivedChunkId,
           isWaitingResponse.value,
-        );
+        ).catch(err => console.error("保存缓存失败", err));
       }
     }
     // 清理所有状态
@@ -808,10 +808,12 @@ watch(
 
     // 从本地缓存中读取：content，lastReceivedChunkId
     let sessionCache = null;
-    if (messageCache.has(newId)) sessionCache = messageCache.get(newId);
+    if (await messageCache.has(newId)) {
+      sessionCache = await messageCache.get(newId);
+    }
 
     // 建立当前会话的SSE连接，监听实时消息
-    subscribeToSession(newId, sessionCache);
+    await subscribeToSession(newId, sessionCache);
 
     // 确保 Observer 已正确初始化
     await nextTick();
