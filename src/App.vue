@@ -4,7 +4,7 @@ import { RouterLink, RouterView } from "vue-router";
 import { useDark, useToggle } from "@vueuse/core";
 import { SunIcon, MoonIcon } from "@heroicons/vue/24/outline";
 import { useRouter } from "vue-router";
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { User, SwitchButton, HomeFilled } from "@element-plus/icons-vue";
 import { useUserStore } from "./stores/user";
 import { UseAPI } from "./services/user";
@@ -19,13 +19,23 @@ const userStore = useUserStore();
 // 添加全局状态来跟踪当前路由
 const currentRoute = ref(router.currentRoute.value.path);
 
-// 登录状态管理
-const isLoggedIn = ref(false);
+// 登录状态管理 - 基于 token 存在性
+const isLoggedIn = computed(() => {
+  return !!userStore.token;
+});
+
+// 是否显示导航栏（404 页面不显示）
+const showNavbar = computed(() => {
+  // 检查路由名称是否为 NotFound
+  return router.currentRoute.value.name !== "NotFound";
+});
+
 // 是否显示返回首页按钮（首页/登录/注册页不显示）
 const showBack = computed(() => {
   const hidden = ["/home", "/login", "/register"];
   return !hidden.includes(currentRoute.value);
 });
+
 // 是否显示管理员按钮
 const isAdmin = computed(() => {
   return userStore.role === "ADMIN";
@@ -35,49 +45,30 @@ const handleGoHome = () => {
   router.push("/home");
 };
 
-// 检查登录状态
-const checkLoginStatus = async () => {
-  const token = localStorage.getItem("token");
-  // 如果没有token，直接设置为未登录
-  if (!token) {
-    isLoggedIn.value = false;
-    return;
-  }
+// 初始化用户信息（仅在应用启动时调用一次）
+const initUserInfo = async () => {
+  const token = userStore.token;
+  if (!token) return;
 
-  // 如果有token，尝试验证token是否有效
   try {
     const res = await UseAPI.getUserInfo();
-    // 如果请求成功，说明token有效
-    if (res.code === 200) {
-      isLoggedIn.value = true;
-      // 更新用户角色信息
-      if (res.data?.role) userStore.setRole(res.data.role);
-    } else handleTokenInvalid();
+    if (res.code === 200 && res.data?.role) {
+      userStore.setRole(res.data.role);
+    } else {
+      // token 无效，清除
+      userStore.clearToken();
+    }
   } catch (error) {
-    // 捕获错误，检查是否是401未授权错误
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      if (status === 401) handleTokenInvalid();
-      else isLoggedIn.value = false;
-    } else isLoggedIn.value = false;
-  }
-};
-
-// 处理token无效的情况
-const handleTokenInvalid = () => {
-  userStore.clearToken();
-  isLoggedIn.value = false;
-  // 如果当前不在登录/注册页面，提示并跳转到登录页
-  if (currentRoute.value !== "/login" && currentRoute.value !== "/register") {
-    ElMessage.warning("登录已过期，请重新登录");
-    router.push("/login");
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      userStore.clearToken();
+    }
   }
 };
 
 // 退出登录
 const handleLogout = () => {
   userStore.clearToken();
-  isLoggedIn.value = false;
+  ElMessage.success("已退出登录");
   // 重定向到登录页面
   router.push("/login");
 };
@@ -106,37 +97,24 @@ const showUserButton = computed(() => {
   return showLogOutButton.value && !isAdmin.value;
 });
 
-// 组件挂载时检查登录状态
+// 组件挂载时初始化用户信息
 onMounted(() => {
-  checkLoginStatus();
+  initUserInfo();
 });
 
-// 添加全局路由守卫
-router.beforeEach(async (to, from, next) => {
-  // 检查登录状态（异步）
-  await checkLoginStatus();
-
-  // 如果用户未登录且访问需要登录的页面，重定向到登录页
-  const publicRoutes = ["/login", "/register"];
-  if (!isLoggedIn.value && !publicRoutes.includes(to.path)) {
-    next("/login");
-    return;
-  }
-
-  // 如果用户已登录且访问登录/注册页面，重定向到首页
-  if (isLoggedIn.value && (to.path === "/login" || to.path === "/register")) {
-    next("/home");
-    return;
-  }
-
-  currentRoute.value = to.path;
-  next();
-});
+// 监听路由变化更新 currentRoute
+watch(
+  () => router.currentRoute.value.path,
+  (newPath) => {
+    currentRoute.value = newPath;
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
   <div class="app" :class="{ dark: isDark }">
-    <nav class="navbar">
+    <nav class="navbar" v-if="showNavbar">
       <div class="navbar-left">
         <router-link to="/home" class="logo">CORS智能助手</router-link>
         <el-button

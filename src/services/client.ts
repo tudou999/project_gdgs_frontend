@@ -26,6 +26,17 @@ const handleResponseError = (error: AxiosError | Error) => {
   if (axios.isCancel(error)) return Promise.reject(error);
 
   const response = (error as AxiosError).response;
+  
+  // 处理 401 未授权错误（token 过期或无效）
+  if (response?.status === 401) {
+    const userStore = useUserStore();
+    userStore.clearToken();
+    ElMessage.warning("登录已过期，请重新登录");
+    // 跳转到登录页
+    window.location.href = "/login";
+    return Promise.reject(error);
+  }
+  
   if (response && response.status !== 200)
     ElMessage.warning("响应失败！请联系管理员");
 
