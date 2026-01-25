@@ -7,7 +7,7 @@ import { useRouter } from "vue-router";
 import { ref, computed, onMounted, watch } from "vue";
 import { User, SwitchButton, HomeFilled } from "@element-plus/icons-vue";
 import { useUserStore } from "./stores/user";
-import { UseAPI } from "./services/user";
+import { UseAPI, SignAPI } from "./services/user";
 import { ElMessage } from "element-plus";
 import axios from "axios";
 
@@ -66,11 +66,12 @@ const initUserInfo = async () => {
 };
 
 // 退出登录
-const handleLogout = () => {
+const handleLogout = async () => {
+  await SignAPI.postLogout();
   userStore.clearToken();
   ElMessage.success("已退出登录");
   // 重定向到登录页面
-  router.push("/login");
+  await router.push("/login");
 };
 
 // 是否显示退出登录按钮（登录和注册页面不显示）
@@ -108,7 +109,7 @@ watch(
   (newPath) => {
     currentRoute.value = newPath;
   },
-  { immediate: true }
+  { immediate: true },
 );
 </script>
 

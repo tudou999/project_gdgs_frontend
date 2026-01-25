@@ -11,6 +11,21 @@ import type { ResType } from "../interface/Tgeneral";
 
 const BASE_URL = "/api/v1";
 
+// Token 刷新状态管理
+let isRefreshing = false;
+let refreshSubscribers: Array<(token: string) => void> = [];
+
+// 订阅 token 刷新
+const subscribeTokenRefresh = (callback: (token: string) => void) => {
+  refreshSubscribers.push(callback);
+};
+
+// 通知所有订阅者 token 已刷新
+const onTokenRefreshed = (token: string) => {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+};
+
 // 添加 token
 const addAuthHeader = (
   config: InternalAxiosRequestConfig,
@@ -26,17 +41,7 @@ const handleResponseError = (error: AxiosError | Error) => {
   if (axios.isCancel(error)) return Promise.reject(error);
 
   const response = (error as AxiosError).response;
-  
-  // 处理 401 未授权错误（token 过期或无效）
-  if (response?.status === 401) {
-    const userStore = useUserStore();
-    userStore.clearToken();
-    ElMessage.warning("登录已过期，请重新登录");
-    // 跳转到登录页
-    window.location.href = "/login";
-    return Promise.reject(error);
-  }
-  
+
   if (response && response.status !== 200)
     ElMessage.warning("响应失败！请联系管理员");
 
@@ -61,10 +66,68 @@ axiosInstance.interceptors.request.use(addAuthHeader, handleResponseError);
 rawAxiosInstance.interceptors.request.use(addAuthHeader, handleResponseError);
 
 // 响应拦截器：返回 res.data
-axiosInstance.interceptors.response.use(
-  (res: AxiosResponse) => res.data,
-  handleResponseError,
-);
+axiosInstance.interceptors.response.use(async (res: AxiosResponse) => {
+  console.log(res);
+
+  // 检测业务码 401，表示 token 过期
+  if (res.data.code === 401) {
+    const originalRequest = res.config;
+
+    // 如果正在刷新 token，将请求加入队列
+    if (isRefreshing) {
+      return new Promise((resolve) => {
+        subscribeTokenRefresh((newToken: string) => {
+          // 更新请求头中的 token
+          originalRequest.headers.Authorization = newToken;
+          // 重试原始请求
+          resolve(axiosInstance(originalRequest));
+        });
+      });
+    }
+
+    // 开始刷新 token
+    isRefreshing = true;
+
+    try {
+      // 调用 refresh 接口
+      const refreshResponse = await axios.post<ResType>(
+        `${BASE_URL}/user/auth/refresh`,
+      );
+
+      if (refreshResponse.data.code === 200) {
+        const newToken = refreshResponse.data.data;
+
+        // 更新 store 中的 token
+        useUserStore().setToken(newToken);
+
+        // 更新原始请求的 token
+        originalRequest.headers.Authorization = newToken;
+
+        // 通知所有等待的请求
+        onTokenRefreshed(newToken);
+
+        // 重试原始请求
+        return axiosInstance(originalRequest);
+      } else {
+        // refresh 失败，清除 token 并跳转登录
+        useUserStore().clearToken();
+        ElMessage.error("登录已过期，请重新登录");
+        window.location.href = "/login";
+        return Promise.reject(new Error("Token refresh failed"));
+      }
+    } catch (error) {
+      // refresh 请求失败
+      useUserStore().clearToken();
+      ElMessage.error("登录已过期，请重新登录");
+      window.location.href = "/login";
+      return Promise.reject(error);
+    } finally {
+      isRefreshing = false;
+    }
+  }
+
+  return res.data;
+}, handleResponseError);
 rawAxiosInstance.interceptors.response.use((res: AxiosResponse) => {
   if (
     res.config.responseType === "blob" ||

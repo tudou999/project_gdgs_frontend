@@ -179,7 +179,7 @@ const handleRegister = async (): Promise<void> => {
 
   isLoading.value = true;
   try {
-    const response = await SignAPI.register(registerForm.value);
+    const response = await SignAPI.postRegister(registerForm.value);
     if (response.code === 200) {
       await router.push("/login");
       ElMessage.success("注册成功！");

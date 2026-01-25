@@ -53,8 +53,7 @@ const total = ref(0); // 当前会话消息总数
 const loadingMore = ref(false); // 是否正在加载上一页历史，避免重复请求
 const hasMore = ref(true); // 是否还有更多历史可加载
 let skeletonTimer = null; // 骨架屏延迟显示定时器
-const typingBuffer = ref(""); // 打字机效果缓冲区，保存尚未输出到界面的内容
-let typingTimer = null; // 打字机定时器句柄，用于逐字符刷新界面
+let typingBuffer = ref(""); // 打字机效果缓冲区，保存尚未输出到界面的内容
 let lastReceivedChunkId = null; // 最后收到的 SSE chunk ID，用于断点续传
 const activeAssistantMessage = ref(null); // 正在流式输出的 AI 消息对象
 // 是否显示骨架屏
@@ -72,54 +71,53 @@ let sessionSseHandle = null; // 当前会话的SSE连接句柄，用于监听实
 // 模式（本地/在线）（false表示本地，true表示在线）
 const mode = ref(false);
 
-/*根据缓存长度动态调整打字机速度
-使用反比例函数实现平滑的速度调节：缓冲区越长，渲染越快
-公式：delay = maxDelay / (1 + bufferLength / factor)
-- bufferLength = 0 时，delay ≈ 25ms（最慢）
-- bufferLength 增大时，delay 平滑减小（最快约 5ms）*/
-function computeTypingDelay(bufferLength) {
-  const maxDelay = 25; // 最大延迟（ms），缓冲区为空时的速度
-  const minDelay = 5; // 最小延迟（ms），缓冲区很大时的最快速度
-  const factor = 100; // 调节因子，控制速度变化的敏感度
-
-  // 计算延迟：当 bufferLength 为 0 时接近 maxDelay，增大时接近 minDelay
-  const delay = maxDelay / (1 + bufferLength / factor);
-
-  // 确保延迟在合理范围内
-  return Math.max(minDelay, Math.min(maxDelay, delay));
+/*根据缓冲区长度动态计算每帧输出的字符数
+使用分级策略：缓冲区越长，每帧输出越多
+- bufferLength ≤ 50：每帧 1 字符（平滑效果）
+- bufferLength ≤ 100：每帧 2 字符
+- bufferLength ≤ 200：每帧 4 字符
+- bufferLength ≤ 400：每帧 8 字符
+- bufferLength > 400：每帧 16 字符（快速追赶）*/
+function computeCharsPerFrame(bufferLength) {
+  if (bufferLength <= 50) return 1;
+  if (bufferLength <= 100) return 2;
+  if (bufferLength <= 200) return 4;
+  if (bufferLength <= 400) return 8;
+  return 16;
 }
 
-// 启动打字机渲染
+// 启动打字机渲染（使用 RAF）
+let rafId = null; // RAF 句柄
+
 function startTypingLoop() {
-  if (typingTimer) return;
+  if (rafId !== null) return;
 
   const tick = () => {
     if (!typingBuffer.value.length) {
-      // 仍在流式，则保持轻量轮询等待新 chunk
+      // 仍在流式，则保持轮询等待新 chunk
       if (isStreaming.value) {
-        typingTimer = setTimeout(tick, 30);
+        rafId = requestAnimationFrame(tick);
         return;
       }
-      clearTimeout(typingTimer);
-      typingTimer = null;
+      rafId = null;
       activeAssistantMessage.value = null;
       return;
     }
 
-    const nextChar = typingBuffer.value[0];
-    typingBuffer.value = typingBuffer.value.slice(1);
+    // 根据缓冲区长度计算本帧输出字符数
+    const charsToOutput = computeCharsPerFrame(typingBuffer.value.length);
+    const outputChars = typingBuffer.value.slice(0, charsToOutput);
+    typingBuffer.value = typingBuffer.value.slice(charsToOutput);
+
     const msg = activeAssistantMessage.value;
-    if (msg) msg.content += nextChar;
+    if (msg) msg.content += outputChars;
 
     nextTick(() => scrollToBottom());
 
-    typingTimer = setTimeout(
-      tick,
-      computeTypingDelay(typingBuffer.value.length),
-    );
+    rafId = requestAnimationFrame(tick);
   };
 
-  typingTimer = setTimeout(tick, computeTypingDelay(typingBuffer.value.length));
+  rafId = requestAnimationFrame(tick);
 }
 
 // 重置分页状态
@@ -184,9 +182,9 @@ function NewSSE(sessionId) {
       isWaitingResponse.value = false;
       // 发生错误时也清除缓存
       messageCache.remove(sessionId);
-      if (typingTimer) {
-        clearTimeout(typingTimer);
-        typingTimer = null;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
       activeAssistantMessage.value = null;
     },
@@ -236,7 +234,9 @@ async function subscribeToSession(sessionId, sessionCache) {
       if (id === "ARCHIVE_FINISHED") {
         sessionSseArchived = true;
         isStreaming.value = false;
-        messageCache.remove(sessionId).catch(err => console.error("清除缓存失败", err));
+        messageCache
+          .remove(sessionId)
+          .catch((err) => console.error("清除缓存失败", err));
         newHandle.cancel();
         sessionSseHandle = null;
       } else {
@@ -298,9 +298,9 @@ async function subscribeToSession(sessionId, sessionCache) {
       isWaitingResponse.value = false;
       // 发生错误时也清除缓存
       messageCache.remove(sessionId);
-      if (typingTimer) {
-        clearTimeout(typingTimer);
-        typingTimer = null;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
       }
       activeAssistantMessage.value = null;
     },
@@ -468,9 +468,9 @@ async function startStream(data) {
     nextTick(() => {
       adjustTextareaHeight();
     });
-    if (typingTimer) {
-      clearTimeout(typingTimer);
-      typingTimer = null;
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
 
     isPromotingFromLocal.value = true;
@@ -514,9 +514,9 @@ async function startStream(data) {
   nextTick(() => {
     adjustTextareaHeight();
   });
-  if (typingTimer) {
-    clearTimeout(typingTimer);
-    typingTimer = null;
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
   }
 
   // 将临时用户消息添加到当前消息列表
@@ -558,9 +558,9 @@ async function startStream(data) {
     // startChat 或 subscribeChatStream 出错
     isStreaming.value = false;
     isWaitingResponse.value = false;
-    if (!typingBuffer.value.length && typingTimer) {
-      clearTimeout(typingTimer);
-      typingTimer = null;
+    if (!typingBuffer.value.length && rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
     console.error("发送消息失败:", err);
   }
@@ -570,20 +570,22 @@ async function startStream(data) {
 function stopStream() {
   if (sessionSseHandle) closeSse();
   chatAPI
-    .patchStopMessage(props.chatId)
+    .postStopMessage(props.chatId)
     .catch((err) => console.error("停止对话失败:", err));
   isStreaming.value = false;
   isWaitingResponse.value = false;
 
   // 清除缓存，避免切换页面后恢复等待状态
   if (props.chatId) {
-    messageCache.remove(props.chatId).catch(err => console.error("清除缓存失败", err));
+    messageCache
+      .remove(props.chatId)
+      .catch((err) => console.error("清除缓存失败", err));
   }
 
   typingBuffer.value = "";
-  if (typingTimer) {
-    clearTimeout(typingTimer);
-    typingTimer = null;
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
   }
   if (activeAssistantMessage.value) {
     const msg = activeAssistantMessage.value;
@@ -737,7 +739,7 @@ onMounted(() => {
   // 监听浏览器刷新/关闭/跳转事件
   window.addEventListener("beforeunload", () => {
     // 使用 sendBeacon 或同步方式保存缓存（beforeunload 中异步操作可能不会完成）
-    saveStreamCache().catch(err => console.error("保存缓存失败", err));
+    saveStreamCache().catch((err) => console.error("保存缓存失败", err));
     localStorage.setItem("chatMode", String(mode.value));
   });
 
@@ -771,12 +773,14 @@ watch(
         const fullContent = activeAssistantMessage.value
           ? activeAssistantMessage.value.content + typingBuffer.value
           : "";
-        messageCache.save(
-          oldId,
-          fullContent,
-          lastReceivedChunkId,
-          isWaitingResponse.value,
-        ).catch(err => console.error("保存缓存失败", err));
+        messageCache
+          .save(
+            oldId,
+            fullContent,
+            lastReceivedChunkId,
+            isWaitingResponse.value,
+          )
+          .catch((err) => console.error("保存缓存失败", err));
       }
     }
     // 清理所有状态
@@ -792,9 +796,9 @@ watch(
       clearTimeout(skeletonTimer);
       skeletonTimer = null;
     }
-    if (typingTimer) {
-      clearTimeout(typingTimer);
-      typingTimer = null;
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
 
     // 进入
@@ -833,9 +837,9 @@ onBeforeUnmount(() => {
   cleanupObservers();
 
   // 清理定时器
-  if (typingTimer) {
-    clearTimeout(typingTimer);
-    typingTimer = null;
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
   }
   if (skeletonTimer) {
     clearTimeout(skeletonTimer);

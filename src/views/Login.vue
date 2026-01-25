@@ -80,7 +80,7 @@ defineOptions({
 
 import { type Ref, ref } from "vue";
 import { useRouter } from "vue-router";
-import { SignAPI } from "../services/user.ts";
+import { SignAPI, UseAPI } from "@/services/user.ts";
 import { ElMessage } from "element-plus";
 import { useUserStore } from "../stores/user";
 import type { LoginFormType } from "../interface/Tlogin.ts";
@@ -104,12 +104,12 @@ const handleLogin = async (): Promise<void> => {
   isLoading.value = true;
 
   try {
-    const res = await SignAPI.login(loginForm.value);
+    const res = await SignAPI.postLogin(loginForm.value);
 
     if (res.code === 200) {
       // 设置状态
       userStore.setRole(res.data.role);
-      userStore.setToken(res.data.token);
+      userStore.setToken(res.data.accessToken);
 
       // 跳转到首页
       await router.replace("/home");
