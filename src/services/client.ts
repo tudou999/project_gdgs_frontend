@@ -40,7 +40,20 @@ const handleResponseError = (error: AxiosError | Error) => {
   // 主动取消的请求不提示错误
   if (axios.isCancel(error)) return Promise.reject(error);
 
+  // 开发环境检测
+  const isDev = import.meta.env.DEV || import.meta.env.MODE === "development";
+  const userStore = useUserStore();
+  const isMockToken =
+    isDev && userStore.token?.startsWith("dev-mock-token-");
+
   const response = (error as AxiosError).response;
+
+  // 开发环境下使用假token时，如果是网络错误（后端未启动），静默处理
+  if (isMockToken && (!response || response.status === 0)) {
+    console.warn("开发模式：后端未启动，请求失败（这是正常的）");
+    // 不显示错误提示，直接返回reject
+    return Promise.reject(error);
+  }
 
   if (response && response.status !== 200)
     ElMessage.warning("响应失败！请联系管理员");
@@ -67,10 +80,22 @@ rawAxiosInstance.interceptors.request.use(addAuthHeader, handleResponseError);
 
 // 响应拦截器：返回 res.data
 axiosInstance.interceptors.response.use(async (res: AxiosResponse) => {
-  console.log(res);
+  // 开发环境检测
+  const isDev = import.meta.env.DEV || import.meta.env.MODE === "development";
+  const userStore = useUserStore();
+  // 检查是否是假token（开发环境）
+  const isMockToken =
+    isDev && userStore.token?.startsWith("dev-mock-token-");
 
   // 检测业务码 401，表示 token 过期
   if (res.data.code === 401) {
+    // 开发环境下使用假token时，跳过token刷新逻辑
+    if (isMockToken) {
+      console.warn("开发模式：检测到401错误，但使用假token，跳过token刷新");
+      // 直接返回错误响应，不进行token刷新和清除
+      return res.data;
+    }
+
     const originalRequest = res.config;
 
     // 如果正在刷新 token，将请求加入队列

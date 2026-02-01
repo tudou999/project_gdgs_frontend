@@ -6,8 +6,17 @@ import {
   Close,
   FolderAdd,
   Operation,
+  Search,
+  Upload,
 } from "@element-plus/icons-vue";
-import { computed, nextTick, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  ref,
+  watch,
+  onBeforeUnmount,
+  onMounted,
+} from "vue";
 import { fileAPI } from "../services/file.ts";
 import { useRoute, useRouter } from "vue-router";
 import { filesize } from "filesize";
@@ -21,6 +30,7 @@ import type {
 } from "../interface/TfileSystem.ts";
 import type { AxiosProgressEvent } from "axios";
 import type { VirtualElement } from "@popperjs/core";
+import { debounce } from "lodash-es";
 
 const deleteVirtualRef = ref<VirtualElement | null>(null);
 
@@ -671,6 +681,183 @@ const gotoUpload = () => {
   });
 };
 
+/*搜索相关
+ * */
+// 搜索状态
+const isSearchExpanded = ref<boolean>(false);
+const searchKeyword = ref<string>("");
+const highlightKeyword = ref<string>(""); // 用于高亮显示的关键词（请求完成后更新）
+const isSearching = ref<boolean>(false);
+const searchResults = ref<FileRawInfoType[]>([]);
+const isInSearchMode = ref<boolean>(false);
+
+// 搜索输入框引用
+const searchInputRef = ref<any>(null);
+// 搜索容器引用
+const searchContainerRef = ref<HTMLElement | null>(null);
+
+// 展开搜索框
+const expandSearch = () => {
+  if (!isSearchExpanded.value) {
+    isSearchExpanded.value = true;
+    nextTick(() => {
+      if (searchInputRef.value) {
+        searchInputRef.value.focus();
+      }
+    });
+  }
+};
+
+// 点击外部区域收起搜索框
+const handleClickOutside = (event: MouseEvent) => {
+  if (
+    isSearchExpanded.value &&
+    searchContainerRef.value &&
+    !searchContainerRef.value.contains(event.target as Node)
+  ) {
+    collapseSearch();
+  }
+};
+
+// 监听点击事件
+onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+});
+
+// 收起搜索框（如果没有搜索关键词且不在搜索模式）
+const collapseSearch = () => {
+  // 如果正在搜索模式或有搜索关键词，保持展开
+  if (isInSearchMode.value || searchKeyword.value) return;
+
+  // 直接切换状态，CSS transition 会自动处理动画
+  isSearchExpanded.value = false;
+};
+
+// 高亮搜索关键词函数
+const highlightText = (text: string, keyword: string): string => {
+  if (!keyword || !text) {
+    // 如果没有关键词，返回转义后的文本
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  // 转义 HTML 特殊字符，防止 XSS 攻击
+  const escapeHtml = (str: string) => {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
+  // 转义正则表达式的特殊字符
+  const escapeRegex = (str: string) => {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  };
+
+  // 转义正则表达式的特殊字符，创建正则表达式
+  const trimmedKeyword = keyword.trim();
+  const escapedKeyword = escapeRegex(trimmedKeyword);
+  if (!escapedKeyword) {
+    return escapeHtml(text);
+  }
+
+  const regex = new RegExp(`(${escapedKeyword})`, "gi");
+
+  // 在原始文本上匹配，然后转义 HTML 并添加高亮标记
+  const result = text.replace(regex, (match) => {
+    return `<span class="search-highlight">${escapeHtml(match)}</span>`;
+  });
+
+  // 如果没有匹配到，返回转义后的原始文本
+  if (result === text) {
+    return escapeHtml(text);
+  }
+
+  return result;
+};
+
+/*防抖搜索
+ * */
+const performSearch = async () => {
+  if (!searchKeyword.value.trim()) {
+    searchResults.value = [];
+    isInSearchMode.value = false;
+    highlightKeyword.value = ""; // 清空高亮关键词
+    await reloadContent();
+    return;
+  }
+
+  isSearching.value = true;
+  isInSearchMode.value = true;
+
+  try {
+    const res = await fileAPI.getSearchFiles(searchKeyword.value.trim());
+    console.log("🚀🚀🚀🚀", res);
+    if (res.code === 200) {
+      searchResults.value = res.data.records || [];
+      fileList.value = searchResults.value.map((item: FileRawInfoType) => ({
+        ...item,
+        editing: 0,
+      }));
+      // 请求成功后，更新高亮关键词
+      highlightKeyword.value = searchKeyword.value.trim();
+    } else {
+      ElMessage.error("搜索失败：" + res.msg);
+      searchResults.value = [];
+      highlightKeyword.value = ""; // 搜索失败时清空高亮
+    }
+  } catch (error) {
+    console.error("搜索失败:", error);
+    ElMessage.warning("搜索失败！请联系管理员");
+    searchResults.value = [];
+    highlightKeyword.value = ""; // 搜索失败时清空高亮
+  } finally {
+    isSearching.value = false;
+  }
+};
+const debouncedSearch = debounce(() => {
+  performSearch();
+}, 500);
+// 搜索关键词变化处理
+const handleSearchInput = () => {
+  debouncedSearch();
+};
+
+// 清除搜索
+const clearSearch = async () => {
+  searchKeyword.value = "";
+  highlightKeyword.value = ""; // 清空高亮关键词
+  searchResults.value = [];
+  isInSearchMode.value = false;
+  // 清除后自动收起（通过 blur 事件触发）
+  await reloadContent();
+};
+
+// 点击文件夹时退出搜索模式
+const handleFolderClick = async (id: string) => {
+  if (isInSearchMode.value) {
+    // 退出搜索模式
+    searchKeyword.value = "";
+    highlightKeyword.value = ""; // 清空高亮关键词
+    searchResults.value = [];
+    isInSearchMode.value = false;
+    isSearchExpanded.value = false;
+  }
+  await pushId(id);
+};
+
+// 清理定时器和事件监听
+onBeforeUnmount(() => {
+  debouncedSearch.cancel();
+  document.removeEventListener("click", handleClickOutside);
+});
+
 /*更新文件相关
  * */
 const chooseId = ref<string | null>(null);
@@ -734,7 +921,7 @@ const handleFileChange = async (e: Event) => {
 </script>
 
 <template>
-  <el-container>
+  <el-container class="file-table-container">
     <input
       ref="fileInput"
       type="file"
@@ -742,7 +929,7 @@ const handleFileChange = async (e: Event) => {
       @change="handleFileChange"
       :multiple="false"
     />
-    <el-main style="margin: 0 400px">
+    <el-main class="file-table-main">
       <!-- 上传进度条 -->
       <div v-if="isUploading" class="upload-progress-fixed">
         <div style="margin-bottom: 10px">
@@ -769,7 +956,11 @@ const handleFileChange = async (e: Event) => {
 
       <div class="header-section">
         <!-- 面包屑 -->
-        <el-breadcrumb style="margin: 0" :separator-icon="ArrowRight">
+        <el-breadcrumb
+          class="breadcrumb-container"
+          v-show="!isSearchExpanded"
+          :separator-icon="ArrowRight"
+        >
           <el-breadcrumb-item
             v-for="(item, index) in breadcrumbTrail"
             :key="`${item.id}-${index}`"
@@ -780,14 +971,45 @@ const handleFileChange = async (e: Event) => {
           </el-breadcrumb-item>
         </el-breadcrumb>
 
-        <!-- 文件上传按钮（会跳转到上传界面） -->
-        <el-button
-          type="default"
-          size="large"
-          class="upload-button"
-          @click="gotoUpload()"
-          round
+        <!-- 搜索框容器 -->
+        <div
+          class="search-container"
+          :class="{ expanded: isSearchExpanded }"
+          ref="searchContainerRef"
         >
+          <!-- 搜索按钮 -->
+          <el-button
+            class="search-button"
+            :class="{ hidden: isSearchExpanded }"
+            type="default"
+            size="large"
+            round
+            @click="expandSearch"
+          >
+            <el-icon><Search /></el-icon>
+          </el-button>
+
+          <!-- 搜索输入框 -->
+          <div class="search-input-wrapper">
+            <el-input
+              ref="searchInputRef"
+              v-model="searchKeyword"
+              placeholder="搜索文件/文件夹"
+              class="search-input"
+              clearable
+              @input="handleSearchInput"
+              @clear="clearSearch"
+              @blur="collapseSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+          </div>
+        </div>
+
+        <!-- 文件上传按钮（会跳转到上传界面） -->
+        <el-button type="default" size="large" @click="gotoUpload()" round>
           <el-icon><Upload /></el-icon>
           上传文件
         </el-button>
@@ -837,15 +1059,19 @@ const handleFileChange = async (e: Event) => {
             class="folder-link file-name"
             role="button"
             tabindex="0"
-            @click="pushId(file.id)"
-            @keydown.enter="pushId(file.id)"
-            @keydown.space.prevent="pushId(file.id)"
+            @click="handleFolderClick(file.id)"
+            @keydown.enter="handleFolderClick(file.id)"
+            @keydown.space.prevent="handleFolderClick(file.id)"
             @dragover.prevent="onFolderDragOver"
             @dragenter.prevent="onFolderDragEnter(file)"
             @dragleave.prevent="onFolderDragLeave(file)"
             @drop="onFolderDrop(file)"
           >
-            {{ file.name }}
+            <span
+              v-if="isInSearchMode && highlightKeyword"
+              v-html="highlightText(file.name, highlightKeyword)"
+            ></span>
+            <span v-else>{{ file.name }}</span>
           </div>
 
           <!-- 文件 -->
@@ -855,10 +1081,25 @@ const handleFileChange = async (e: Event) => {
             draggable="true"
             @dragstart="onFileDragStart(file)"
           >
-            <span class="file-name-text">{{ file.name }}</span>
-            <span class="file-size-text">{{
-              calculateFileSize(file.size)
+            <el-tooltip placement="top">
+              <template #content>{{ file.name }}</template>
+              <span class="file-name-text">
+                <span
+                  v-if="isInSearchMode && highlightKeyword"
+                  v-html="highlightText(file.name, highlightKeyword)"
+                ></span>
+                <span v-else>{{ file.name }}</span>
+              </span>
+            </el-tooltip>
+
+            <span class="file-updated-text">{{
+              formatDate(file.updated)
             }}</span>
+            <div class="file-size-container">
+              <span class="file-size-text">{{
+                calculateFileSize(file.size)
+              }}</span>
+            </div>
           </div>
           <el-dropdown trigger="click" size="large" :hide-on-click="false">
             <el-button
@@ -1065,6 +1306,14 @@ const handleFileChange = async (e: Event) => {
 </template>
 
 <style scoped lang="scss">
+.file-table-container {
+  display: flex;
+  justify-content: center;
+
+  .file-table-main {
+    max-width: 1000px;
+  }
+}
 .file-item {
   font-size: 16px;
   padding: 0 16px;
@@ -1146,15 +1395,73 @@ const handleFileChange = async (e: Event) => {
   border: 1px solid var(--el-border-color);
   border-radius: 8px;
   padding: 10px 16px;
-  min-height: 50px;
-}
+  min-height: 68px;
+  overflow: hidden;
 
-.upload-button {
-  margin-left: auto;
+  .breadcrumb-container {
+    margin: 0;
+  }
 }
 
 .createFolder-button {
   margin-right: 16px;
+}
+
+.search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 12px;
+  min-width: 40px;
+  height: 40px;
+  flex: 1; // 新增：占据剩余空间
+  max-width: 100%; // 新增：防止超出父容器
+}
+
+.search-button {
+  margin-left: auto;
+  min-width: 40px;
+  padding: 8px;
+  flex-shrink: 0;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.8);
+  }
+}
+
+.search-input-wrapper {
+  position: absolute;
+  left: 0; // 从左边开始
+  right: 0; // 到右边结束（铺满父容器）
+  // width: 0;          // 移除，使用 left/right 控制
+  max-width: 0; // 初始状态：完全收起
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.search-container.expanded .search-input-wrapper {
+  max-width: 100%;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.search-input {
+  width: 100%;
+
+  :deep(.el-input__wrapper) {
+    border-radius: 20px;
+  }
 }
 
 .name-input {
@@ -1194,13 +1501,32 @@ const handleFileChange = async (e: Event) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  .file-name-text {
+    width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
-.file-size-text {
+.file-updated-text {
   margin-left: auto;
   flex-shrink: 0;
-  margin-right: 12px;
+  margin-right: 16px;
   color: var(--el-text-color-secondary);
+  font-size: 14px;
+}
+
+.file-size-container {
+  min-width: 90px;
+  margin-right: 12px;
+
+  .file-size-text {
+    flex-shrink: 0;
+    color: var(--el-text-color-secondary);
+    width: 100%;
+  }
 }
 
 .action-button {
@@ -1233,6 +1559,11 @@ const handleFileChange = async (e: Event) => {
 
 .file-item-normal .folder-link:hover {
   text-decoration: underline;
+}
+
+:deep(.search-highlight) {
+  color: var(--el-color-warning-dark-2) !important;
+  display: inline !important;
 }
 
 .folder-drop-hover {
