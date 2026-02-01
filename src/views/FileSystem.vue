@@ -50,7 +50,15 @@ const folderCache = new Map();
 const formatDate = (dateString: Date) => {
   if (!dateString) return "-";
   const date = new Date(dateString);
-  return date.toLocaleString("zh-CN");
+  return date.toLocaleString("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 };
 
 // 当前路径的 ID 数组（从根到当前文件夹）
@@ -666,9 +674,20 @@ const downloadFile = async (id: string, name: string) => {
   isDownloading.value = false;
 };
 
-// 计算文件大小
+// 计算文件大小（返回完整字符串）
 const calculateFileSize = (size: string): string => {
   return filesize(size, { standard: "jedec" });
+};
+
+// 计算文件大小，拆分为数字和单位
+const parseFileSize = (size: string): { number: string; unit: string } => {
+  const full = filesize(size, { standard: "jedec" });
+  const parts = full.split(/\s+/);
+  if (parts.length >= 2) {
+    const unit = parts.pop()!;
+    return { number: parts.join(" "), unit };
+  }
+  return { number: full, unit: "" };
 };
 
 // 前往上传界面
@@ -798,7 +817,6 @@ const performSearch = async () => {
 
   try {
     const res = await fileAPI.getSearchFiles(searchKeyword.value.trim());
-    console.log("🚀🚀🚀🚀", res);
     if (res.code === 200) {
       searchResults.value = res.data.records || [];
       fileList.value = searchResults.value.map((item: FileRawInfoType) => ({
@@ -1033,8 +1051,17 @@ const handleFileChange = async (e: Event) => {
         :class="{ 'folder-drop-hover': hoverFolderId === file.id }"
       >
         <!-- 编辑状态 -->
-        <div v-if="file.editing !== 0" class="file-item-editing">
-          <el-input class="name-input" v-model="file.name" clearable />
+        <div
+          v-if="file.editing !== 0"
+          class="file-item-editing"
+          :data-folder="file.folder"
+        >
+          <el-input
+            class="name-input"
+            size="small"
+            v-model="file.name"
+            clearable
+          />
           <el-button
             type="primary"
             @click="
@@ -1053,51 +1080,48 @@ const handleFileChange = async (e: Event) => {
 
         <!-- 正常状态 -->
         <div v-else class="file-item-normal">
-          <!-- 文件夹 -->
           <div
-            v-if="file.folder"
-            class="folder-link file-name"
-            role="button"
-            tabindex="0"
-            @click="handleFolderClick(file.id)"
-            @keydown.enter="handleFolderClick(file.id)"
-            @keydown.space.prevent="handleFolderClick(file.id)"
-            @dragover.prevent="onFolderDragOver"
-            @dragenter.prevent="onFolderDragEnter(file)"
-            @dragleave.prevent="onFolderDragLeave(file)"
-            @drop="onFolderDrop(file)"
+            :class="['file-name', { 'folder-link': file.folder }]"
+            :role="file.folder ? 'button' : undefined"
+            :tabindex="file.folder ? 0 : undefined"
+            :draggable="!file.folder"
+            @click="file.folder ? handleFolderClick(file.id) : undefined"
+            @keydown.enter="
+              file.folder ? handleFolderClick(file.id) : undefined
+            "
+            @keydown.space.prevent="
+              file.folder ? handleFolderClick(file.id) : undefined
+            "
+            @dragover.prevent="file.folder ? onFolderDragOver : undefined"
+            @dragenter.prevent="
+              file.folder ? onFolderDragEnter(file) : undefined
+            "
+            @dragleave.prevent="
+              file.folder ? onFolderDragLeave(file) : undefined
+            "
+            @drop="file.folder ? onFolderDrop(file) : undefined"
+            @dragstart="!file.folder ? onFileDragStart(file) : undefined"
           >
-            <span
-              v-if="isInSearchMode && highlightKeyword"
-              v-html="highlightText(file.name, highlightKeyword)"
-            ></span>
-            <span v-else>{{ file.name }}</span>
-          </div>
-
-          <!-- 文件 -->
-          <div
-            v-else
-            class="file-name"
-            draggable="true"
-            @dragstart="onFileDragStart(file)"
-          >
-            <el-tooltip placement="top">
-              <template #content>{{ file.name }}</template>
-              <span class="file-name-text">
+            <span :class="file.folder ? 'folder-name' : 'file-name-text'">
+              <el-tooltip placement="top">
+                <template #content>{{ file.name }}</template>
                 <span
                   v-if="isInSearchMode && highlightKeyword"
                   v-html="highlightText(file.name, highlightKeyword)"
                 ></span>
                 <span v-else>{{ file.name }}</span>
-              </span>
-            </el-tooltip>
+              </el-tooltip>
+            </span>
 
             <span class="file-updated-text">{{
               formatDate(file.updated)
             }}</span>
             <div class="file-size-container">
-              <span class="file-size-text">{{
-                calculateFileSize(file.size)
+              <span class="file-size-number">{{
+                file.folder ? "-" : parseFileSize(file.size).number
+              }}</span>
+              <span class="file-size-unit">{{
+                file.folder ? "" : parseFileSize(file.size).unit
               }}</span>
             </div>
           </div>
@@ -1330,6 +1354,7 @@ const handleFileChange = async (e: Event) => {
   display: flex;
   align-items: center;
   min-height: 48px;
+  overflow: hidden;
 }
 
 .file-item:first-child {
@@ -1359,8 +1384,12 @@ const handleFileChange = async (e: Event) => {
 .el-breadcrumb {
   padding: 16px 24px;
   margin-bottom: 20px;
+  white-space: nowrap;
+  display: flex;
+  flex-wrap: nowrap;
 
   .el-breadcrumb__item {
+    flex-shrink: 0;
     .el-breadcrumb__inner {
       font-size: 14px;
       transition: color 0.2s ease;
@@ -1400,6 +1429,29 @@ const handleFileChange = async (e: Event) => {
 
   .breadcrumb-container {
     margin: 0;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--el-border-color) transparent;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background-color: var(--el-border-color);
+      border-radius: 3px;
+
+      &:hover {
+        background-color: var(--el-text-color-placeholder);
+      }
+    }
   }
 }
 
@@ -1465,9 +1517,8 @@ const handleFileChange = async (e: Event) => {
 }
 
 .name-input {
-  font-size: 16px;
   width: 200px;
-  min-height: 28px;
+  height: 24px;
   margin-right: 16px;
   :deep(input::placeholder) {
     color: var(--el-text-color-placeholder);
@@ -1483,7 +1534,6 @@ const handleFileChange = async (e: Event) => {
   width: 100%;
   min-height: 48px;
   background: var(--el-bg-color);
-  padding: 8px 10px;
 }
 
 .file-item-normal {
@@ -1502,7 +1552,8 @@ const handleFileChange = async (e: Event) => {
   text-overflow: ellipsis;
   white-space: nowrap;
 
-  .file-name-text {
+  .file-name-text,
+  .folder-name {
     width: 300px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1511,21 +1562,44 @@ const handleFileChange = async (e: Event) => {
 }
 
 .file-updated-text {
+  display: inline-block;
+  text-align: center;
+
   margin-left: auto;
   flex-shrink: 0;
   margin-right: 16px;
   color: var(--el-text-color-secondary);
   font-size: 14px;
+
+  height: 24px;
+  line-height: 24px;
 }
 
 .file-size-container {
-  min-width: 90px;
+  display: flex;
+  align-items: baseline;
   margin-right: 12px;
+  min-width: 90px;
+  flex-shrink: 0;
 
-  .file-size-text {
-    flex-shrink: 0;
+  .file-size-number {
+    display: inline-block;
+    width: 80px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
     color: var(--el-text-color-secondary);
-    width: 100%;
+    height: 24px;
+    line-height: 24px;
+  }
+
+  .file-size-unit {
+    display: inline-block;
+    text-align: center;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    opacity: 0.85;
+    width: 20px;
+    margin-left: auto;
   }
 }
 
@@ -1552,12 +1626,29 @@ const handleFileChange = async (e: Event) => {
   font-size: 16px;
 }
 
+/* 编辑状态下也显示图标 */
+.file-item-editing::before {
+  content: "";
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.file-item-editing[data-folder="true"]::before {
+  content: "📁";
+  height: 24px;
+}
+
+.file-item-editing[data-folder="false"]::before {
+  content: "📄";
+  height: 24px;
+}
+
 .file-item-normal .folder-link {
   color: var(--el-color-primary);
   font-weight: 600;
 }
 
-.file-item-normal .folder-link:hover {
+.file-item-normal .folder-link:hover .folder-name {
   text-decoration: underline;
 }
 

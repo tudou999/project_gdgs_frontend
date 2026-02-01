@@ -118,4 +118,19 @@ export const fileAPI = {
       newParentId: targetFolderId,
     });
   },
+
+  // 搜索文件
+  getSearchFiles(
+    keyword: string,
+    pageNumber: number = 1,
+    pageSize: number = 10,
+  ) {
+    return apiClient.get(`${FILE_API_BASE_URL}/search`, {
+      params: {
+        keyword: keyword,
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+      },
+    });
+  },
 };
