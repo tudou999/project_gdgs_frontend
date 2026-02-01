@@ -20,6 +20,7 @@ import {
 import { fileAPI } from "../services/file.ts";
 import { useRoute, useRouter } from "vue-router";
 import { filesize } from "filesize";
+import SystemDashboard from "../components/SystemDashboard.vue";
 import type {
   FileUploadInfo,
   FileShowType,
@@ -1326,6 +1327,9 @@ const handleFileChange = async (e: Event) => {
       confirm-button-text="确认"
       cancel-button-text="取消"
     />
+
+    <!-- 系统监控仪表盘 -->
+    <SystemDashboard />
   </el-container>
 </template>
 
