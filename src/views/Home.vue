@@ -89,7 +89,7 @@ onMounted(loadUserInfo);
 
 <style scoped lang="scss">
 .home {
-  min-height: 100vh;
+  flex: 1;
   padding: 2rem;
   background: var(--bg-color);
   transition: background-color 0.3s;
