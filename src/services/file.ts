@@ -129,7 +129,7 @@ export const fileAPI = {
     return apiClient.get(`${FILE_API_BASE_URL}/search`, {
       params: {
         keyword: keyword,
-        pageNumber: pageNumber,
+        pageNum: pageNumber,
         pageSize: pageSize,
       },
     });

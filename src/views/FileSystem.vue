@@ -804,42 +804,110 @@ const highlightText = (text: string, keyword: string): string => {
 
 /*防抖搜索
  * */
-const performSearch = async () => {
-  if (!searchKeyword.value.trim()) {
+/* ---------------- 搜索与分页逻辑核心修改 ---------------- */
+
+// 分页状态
+const searchPage = ref(1);
+const searchPageSize = ref(15); // 假设每页 20 条
+const hasMoreData = ref(true); // 是否还有更多数据
+const isLoadingMore = ref(false); // 是否正在加载更多
+
+// 修改 performSearch 函数，增加 append 参数
+const performSearch = async (append = false) => {
+  const keyword = searchKeyword.value.trim();
+  if (!keyword) {
+    // 空搜索处理...
     searchResults.value = [];
     isInSearchMode.value = false;
-    highlightKeyword.value = ""; // 清空高亮关键词
+    highlightKeyword.value = "";
     await reloadContent();
     return;
   }
 
-  isSearching.value = true;
+  // 如果是新搜索（非追加），重置状态
+  if (!append) {
+    searchPage.value = 1;
+    hasMoreData.value = true;
+    searchResults.value = [];
+    isSearching.value = true; // 首次加载显示 loading
+  } else {
+    isLoadingMore.value = true; // 追加加载
+  }
+
   isInSearchMode.value = true;
 
   try {
-    const res = await fileAPI.getSearchFiles(searchKeyword.value.trim());
+    // 注意：这里假设你的 API 支持分页参数 (keyword, page, size)
+    // 如果后端不支持，你需要让后端加上，或者前端拿到所有数据后自己做 slice 分页
+    const res = await fileAPI.getSearchFiles(
+      keyword,
+      searchPage.value,
+      searchPageSize.value,
+    );
+
     if (res.code === 200) {
-      searchResults.value = res.data.records || [];
+      const newRecords = res.data.records || [];
+
+      // 判断是否还有更多数据 (如果返回数量小于页大小，说明没了)
+      if (newRecords.length < searchPageSize.value) {
+        hasMoreData.value = false;
+      }
+
+      if (append) {
+        // 追加模式：合并数组
+        searchResults.value = [...searchResults.value, ...newRecords];
+      } else {
+        // 覆盖模式
+        searchResults.value = newRecords;
+        highlightKeyword.value = keyword;
+      }
+
+      // 更新显示的列表，重置编辑状态
       fileList.value = searchResults.value.map((item: FileRawInfoType) => ({
         ...item,
         editing: 0,
       }));
-      // 请求成功后，更新高亮关键词
-      highlightKeyword.value = searchKeyword.value.trim();
     } else {
       ElMessage.error("搜索失败：" + res.msg);
-      searchResults.value = [];
-      highlightKeyword.value = ""; // 搜索失败时清空高亮
+      if (!append) {
+        searchResults.value = [];
+        highlightKeyword.value = "";
+      }
     }
   } catch (error) {
     console.error("搜索失败:", error);
     ElMessage.warning("搜索失败！请联系管理员");
-    searchResults.value = [];
-    highlightKeyword.value = ""; // 搜索失败时清空高亮
   } finally {
     isSearching.value = false;
+    isLoadingMore.value = false;
   }
 };
+
+// 无限滚动触发的方法
+const loadMoreSearch = () => {
+  // 核心守卫：必须在搜索模式 + 还有更多数据 + 没有正在加载
+  if (
+    !isInSearchMode.value ||
+    !hasMoreData.value ||
+    isLoadingMore.value ||
+    isSearching.value
+  ) {
+    return;
+  }
+  searchPage.value++;
+  performSearch(true); // 传入 true 表示追加
+};
+
+// 无限滚动的禁用条件
+const infiniteScrollDisabled = computed(() => {
+  // 如果不在搜索模式，或者正在加载，或者没有更多数据了，就禁用
+  return (
+    !isInSearchMode.value ||
+    isLoadingMore.value ||
+    isSearching.value ||
+    !hasMoreData.value
+  );
+});
 const debouncedSearch = debounce(() => {
   performSearch();
 }, 500);
@@ -1046,160 +1114,177 @@ const handleFileChange = async (e: Event) => {
       </div>
 
       <div
-        v-for="file in fileList"
-        :key="file.id"
-        class="file-item"
-        :class="{ 'folder-drop-hover': hoverFolderId === file.id }"
+        class="file-list-scroll-wrapper"
+        v-infinite-scroll="loadMoreSearch"
+        :infinite-scroll-disabled="infiniteScrollDisabled"
+        :infinite-scroll-distance="50"
       >
-        <!-- 编辑状态 -->
         <div
-          v-if="file.editing !== 0"
-          class="file-item-editing"
-          :data-folder="file.folder"
+          v-for="file in fileList"
+          :key="file.id"
+          class="file-item"
+          :class="{ 'folder-drop-hover': hoverFolderId === file.id }"
         >
-          <el-input
-            class="name-input"
-            size="small"
-            v-model="file.name"
-            clearable
-          />
-          <el-button
-            type="primary"
-            @click="
-              checkOrRename(file.editing!, currentFolderId, file.id, file.name)
-            "
-            size="small"
-            :loading="isConfirmButtonLoading(file)"
-            :disabled="isConfirmButtonDisabled(file)"
-          >
-            <el-icon><Check /></el-icon>
-          </el-button>
-          <el-button @click="cancelEdit()" size="small">
-            <el-icon><Close /></el-icon>
-          </el-button>
-        </div>
-
-        <!-- 正常状态 -->
-        <div v-else class="file-item-normal">
+          <!-- 编辑状态 -->
           <div
-            :class="['file-name', { 'folder-link': file.folder }]"
-            :role="file.folder ? 'button' : undefined"
-            :tabindex="file.folder ? 0 : undefined"
-            :draggable="!file.folder"
-            @click="file.folder ? handleFolderClick(file.id) : undefined"
-            @keydown.enter="
-              file.folder ? handleFolderClick(file.id) : undefined
-            "
-            @keydown.space.prevent="
-              file.folder ? handleFolderClick(file.id) : undefined
-            "
-            @dragover.prevent="file.folder ? onFolderDragOver : undefined"
-            @dragenter.prevent="
-              file.folder ? onFolderDragEnter(file) : undefined
-            "
-            @dragleave.prevent="
-              file.folder ? onFolderDragLeave(file) : undefined
-            "
-            @drop="file.folder ? onFolderDrop(file) : undefined"
-            @dragstart="!file.folder ? onFileDragStart(file) : undefined"
+            v-if="file.editing !== 0"
+            class="file-item-editing"
+            :data-folder="file.folder"
           >
-            <span :class="file.folder ? 'folder-name' : 'file-name-text'">
-              <el-tooltip placement="top">
-                <template #content>{{ file.name }}</template>
-                <span
-                  v-if="isInSearchMode && highlightKeyword"
-                  v-html="highlightText(file.name, highlightKeyword)"
-                ></span>
-                <span v-else>{{ file.name }}</span>
-              </el-tooltip>
-            </span>
-
-            <span class="file-updated-text">{{
-              formatDate(file.updated)
-            }}</span>
-            <div class="file-size-container">
-              <span class="file-size-number">{{
-                file.folder ? "-" : parseFileSize(file.size).number
-              }}</span>
-              <span class="file-size-unit">{{
-                file.folder ? "" : parseFileSize(file.size).unit
-              }}</span>
-            </div>
-          </div>
-          <el-dropdown trigger="click" size="large" :hide-on-click="false">
+            <el-input
+              class="name-input"
+              size="small"
+              v-model="file.name"
+              clearable
+            />
             <el-button
-              size="default"
-              :disabled="isAnyEditing && file.editing === 0"
+              type="primary"
+              @click="
+                checkOrRename(
+                  file.editing!,
+                  currentFolderId,
+                  file.id,
+                  file.name,
+                )
+              "
+              size="small"
+              :loading="isConfirmButtonLoading(file)"
+              :disabled="isConfirmButtonDisabled(file)"
             >
-              菜单
-              <el-icon class="el-icon--right" size="large"
-                ><Operation
-              /></el-icon>
+              <el-icon><Check /></el-icon>
             </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <!-- 文件已上传信息时显示：更新和查看 -->
-                <template v-if="!file.folder && file.association">
+            <el-button @click="cancelEdit()" size="small">
+              <el-icon><Close /></el-icon>
+            </el-button>
+          </div>
+
+          <!-- 正常状态 -->
+          <div v-else class="file-item-normal">
+            <div
+              :class="['file-name', { 'folder-link': file.folder }]"
+              :role="file.folder ? 'button' : undefined"
+              :tabindex="file.folder ? 0 : undefined"
+              :draggable="!file.folder"
+              @click="file.folder ? handleFolderClick(file.id) : undefined"
+              @keydown.enter="
+                file.folder ? handleFolderClick(file.id) : undefined
+              "
+              @keydown.space.prevent="
+                file.folder ? handleFolderClick(file.id) : undefined
+              "
+              @dragover.prevent="file.folder ? onFolderDragOver : undefined"
+              @dragenter.prevent="
+                file.folder ? onFolderDragEnter(file) : undefined
+              "
+              @dragleave.prevent="
+                file.folder ? onFolderDragLeave(file) : undefined
+              "
+              @drop="file.folder ? onFolderDrop(file) : undefined"
+              @dragstart="!file.folder ? onFileDragStart(file) : undefined"
+            >
+              <span :class="file.folder ? 'folder-name' : 'file-name-text'">
+                <el-tooltip placement="top">
+                  <template #content>{{ file.name }}</template>
+                  <span
+                    v-if="isInSearchMode && highlightKeyword"
+                    v-html="highlightText(file.name, highlightKeyword)"
+                  ></span>
+                  <span v-else>{{ file.name }}</span>
+                </el-tooltip>
+              </span>
+
+              <span class="file-updated-text">{{
+                formatDate(file.updated)
+              }}</span>
+              <div class="file-size-container">
+                <span class="file-size-number">{{
+                  file.folder ? "-" : parseFileSize(file.size).number
+                }}</span>
+                <span class="file-size-unit">{{
+                  file.folder ? "" : parseFileSize(file.size).unit
+                }}</span>
+              </div>
+            </div>
+            <el-dropdown trigger="click" size="large" :hide-on-click="false">
+              <el-button
+                size="default"
+                :disabled="isAnyEditing && file.editing === 0"
+              >
+                菜单
+                <el-icon class="el-icon--right" size="large"
+                  ><Operation
+                /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <!-- 文件已上传信息时显示：更新和查看 -->
+                  <template v-if="!file.folder && file.association">
+                    <el-dropdown-item
+                      @click="openUploadInfoDialog(file.id, 'update')"
+                      >更新文件信息</el-dropdown-item
+                    >
+                    <el-dropdown-item @click="clickInfoButton(file.id)"
+                      >查看文件信息</el-dropdown-item
+                    >
+                  </template>
+                  <!-- 文件未上传信息时显示：上传 -->
                   <el-dropdown-item
-                    @click="openUploadInfoDialog(file.id, 'update')"
-                    >更新文件信息</el-dropdown-item
+                    v-if="!file.folder && !file.association"
+                    @click="openUploadInfoDialog(file.id, 'upload')"
+                    >上传文件信息</el-dropdown-item
                   >
-                  <el-dropdown-item @click="clickInfoButton(file.id)"
-                    >查看文件信息</el-dropdown-item
+
+                  <el-dropdown-item
+                    @click="openFileChooser(file.id)"
+                    v-if="!file.folder"
+                    >更新文件</el-dropdown-item
                   >
-                </template>
-                <!-- 文件未上传信息时显示：上传 -->
-                <el-dropdown-item
-                  v-if="!file.folder && !file.association"
-                  @click="openUploadInfoDialog(file.id, 'upload')"
-                  >上传文件信息</el-dropdown-item
-                >
+                  <el-dropdown-item
+                    @click="downloadFile(file.id, file.name)"
+                    v-if="!file.folder"
+                    >下载</el-dropdown-item
+                  >
+                  <el-dropdown-item
+                    @click="openMoveDialog(file)"
+                    v-if="!file.folder"
+                    >移动</el-dropdown-item
+                  >
+                  <el-dropdown-item @click="clickRenameButton(file)"
+                    >重命名</el-dropdown-item
+                  >
+                  <el-dropdown-item
+                    @click="
+                      (e: MouseEvent) => {
+                        deleteTargetId = file.id;
+                        const { clientX, clientY } = e;
 
-                <el-dropdown-item
-                  @click="openFileChooser(file.id)"
-                  v-if="!file.folder"
-                  >更新文件</el-dropdown-item
-                >
-                <el-dropdown-item
-                  @click="downloadFile(file.id, file.name)"
-                  v-if="!file.folder"
-                  >下载</el-dropdown-item
-                >
-                <el-dropdown-item
-                  @click="openMoveDialog(file)"
-                  v-if="!file.folder"
-                  >移动</el-dropdown-item
-                >
-                <el-dropdown-item @click="clickRenameButton(file)"
-                  >重命名</el-dropdown-item
-                >
-                <el-dropdown-item
-                  @click="
-                    (e: MouseEvent) => {
-                      deleteTargetId = file.id;
-                      const { clientX, clientY } = e;
+                        deleteVirtualRef = {
+                          getBoundingClientRect: () =>
+                            ({
+                              width: 0,
+                              height: 0,
+                              top: clientY,
+                              bottom: clientY,
+                              left: clientX,
+                              right: clientX,
+                            }) as DOMRect,
+                        };
 
-                      deleteVirtualRef = {
-                        getBoundingClientRect: () =>
-                          ({
-                            width: 0,
-                            height: 0,
-                            top: clientY,
-                            bottom: clientY,
-                            left: clientX,
-                            right: clientX,
-                          }) as DOMRect,
-                      };
-
-                      deleteConfirmVisible = true;
-                    }
-                  "
-                >
-                  删除
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+                        deleteConfirmVisible = true;
+                      }
+                    "
+                  >
+                    删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
+        <div v-if="isInSearchMode" class="loading-state-footer">
+          <p v-if="isLoadingMore">正在加载更多...</p>
+          <p v-if="!hasMoreData && fileList.length > 0">没有更多文件了</p>
+          <p v-if="!hasMoreData && fileList.length === 0">未找到相关文件</p>
         </div>
       </div>
 
@@ -1721,5 +1806,73 @@ const handleFileChange = async (e: Event) => {
   :deep(.el-progress__text) {
     color: #fff;
   }
+}
+
+/* 1. 让整个容器铺满视口，防止 body 滚动 */
+.full-height-container {
+  height: 100vh; /* 或者 calc(100vh - 顶部导航栏高度) */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 2. 修改 el-main 样式，使其成为 Flex 容器 */
+.file-table-main.flex-column-main {
+  display: flex;
+  flex-direction: column;
+  padding: 20px; /* 根据需要调整 padding */
+  max-width: 1000px;
+  width: 100%;
+  margin: 0 auto;
+  height: 100%; /* 继承父容器高度 */
+  overflow: hidden; /* 防止 el-main 自身滚动 */
+}
+
+/* 3. 头部保持原有样式，它通常有固定高度或由内容撑开 */
+.header-section {
+  flex-shrink: 0; /* 防止头部被压缩 */
+  /* 原有样式保持不变 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  /* ... */
+}
+
+/* 4. 新增：文件列表滚动容器 */
+.file-list-scroll-wrapper {
+  flex: 1; /* 占据剩余所有空间 */
+  overflow-y: auto; /* 仅在此区域开启纵向滚动 */
+  overflow-x: hidden;
+  max-height: 686px;
+
+  /* 可选：美化滚动条 */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--el-border-color);
+    border-radius: 3px;
+  }
+}
+
+/* 底部提示文字样式 */
+.loading-state-footer {
+  text-align: center;
+  padding: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+/* 原有的 .file-item 样式微调 */
+.file-item {
+  /* 移除 margin-bottom: 0 以适应可能的边界塌陷，或者保持原样 */
+  /* 确保最后一项没有奇怪的边框 */
+}
+
+/* 确保第一个和最后一个圆角在滚动容器内正常显示 */
+.file-item:first-child {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
 }
 </style>
