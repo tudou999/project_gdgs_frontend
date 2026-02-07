@@ -139,6 +139,6 @@ export const fileAPI = {
 export const systemAPI = {
   // 获取系统存储使用情况
   getStorageUsage() {
-    return apiClient.get(`${FILE_API_BASE_URL}/usage`);
+    return apiClient.get(`${FILE_API_BASE_URL}/storage/usage`);
   },
 };
