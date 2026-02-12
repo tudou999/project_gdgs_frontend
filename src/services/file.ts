@@ -1,6 +1,7 @@
 import { apiClient, mainAxiosInstance } from "./client.ts";
 import type { FileUploadInfo } from "@/interface/TfileSystem.ts";
 import type { AxiosProgressEvent } from "axios";
+import type { VectorStatusSearchParams } from "@/interface/Tvector.ts";
 
 const FILE_API_BASE_URL = "/files";
 
@@ -140,5 +141,14 @@ export const systemAPI = {
   // 获取系统存储使用情况
   getStorageUsage() {
     return apiClient.get(`${FILE_API_BASE_URL}/storage/usage`);
+  },
+};
+
+export const vectorAPI = {
+  // 获取向量数据库列表（不传 status 为全部查询）
+  getVectorDBList(params?: VectorStatusSearchParams) {
+    return apiClient.get(`${FILE_API_BASE_URL}/vector/status`, {
+      params: params ?? {},
+    });
   },
 };
