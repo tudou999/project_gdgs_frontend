@@ -64,7 +64,7 @@
         <el-table-column
           prop="created"
           label="创建时间"
-          width="180"
+          width="160"
           align="center"
         >
           <template #default="scope">
@@ -74,7 +74,7 @@
         <el-table-column
           prop="updated"
           label="更新时间"
-          width="180"
+          width="160"
           align="center"
         >
           <template #default="scope">
@@ -84,7 +84,7 @@
         <el-table-column
           prop="errorMsg"
           label="错误信息"
-          width="160"
+          width="140"
           show-overflow-tooltip
           align="center"
         >
@@ -92,6 +92,20 @@
             <span v-if="scope.row.errorMsg" style="color: #f56c6c">
               {{ scope.row.errorMsg }}
             </span>
+            <span v-else style="color: #909399">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" align="center" fixed="right">
+          <template #default="scope">
+            <el-button
+              v-if="scope.row.status?.toUpperCase() === 'FAILED'"
+              type="primary"
+              size="small"
+              :loading="retryingId === scope.row.id"
+              @click="handleRetry(scope.row)"
+            >
+              重试
+            </el-button>
             <span v-else style="color: #909399">-</span>
           </template>
         </el-table-column>
@@ -139,15 +153,49 @@ const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(VECTOR_STATUS_PAGE_SIZE_DEFAULT);
 const searchKeyword = ref("");
+const retryingId = ref<string | null>(null);
 
-const loadList = async () => {
-  loading.value = true;
+const handleRetry = async (row: VectorStatusItem) => {
+  if (!row.id) return;
+  retryingId.value = row.id;
+  const currentParams = {
+    pageNum: pageNum.value,
+    pageSize: pageSize.value,
+    keyword: searchKeyword.value,
+  };
   try {
-    const params = buildVectorStatusParams({
-      pageNum: pageNum.value,
-      pageSize: pageSize.value,
-      keyword: searchKeyword.value,
-    });
+    const res = await vectorAPI.postRetryVectorTask(row.storageKey);
+    if (res?.code === 200) {
+      ElMessage.success("重试已提交");
+      await loadList(currentParams);
+    } else {
+      ElMessage.error("重试失败，请稍后重试");
+    }
+  } catch (e) {
+    console.error("重试失败", e);
+    ElMessage.error("重试失败，请稍后重试");
+  } finally {
+    retryingId.value = null;
+  }
+};
+
+const loadList = async (
+  overrideParams?: {
+    pageNum: number;
+    pageSize: number;
+    keyword: string;
+  },
+  silent = false,
+) => {
+  if (!silent) loading.value = true;
+  try {
+    const params = overrideParams
+      ? buildVectorStatusParams(overrideParams)
+      : buildVectorStatusParams({
+          pageNum: pageNum.value,
+          pageSize: pageSize.value,
+          keyword: searchKeyword.value,
+        });
     const res = await vectorAPI.getVectorDBList(params);
     if (res?.code === 200 && res?.data) {
       const data = res.data as VectorStatusResponse;
@@ -167,11 +215,11 @@ const loadList = async () => {
     }
   } catch (e) {
     console.error("加载向量状态失败", e);
-    ElMessage.error("加载向量状态失败，请稍后重试");
+    if (!silent) ElMessage.error("加载向量状态失败，请稍后重试");
     tableData.value = [];
     total.value = 0;
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 };
 
@@ -250,19 +298,26 @@ const goBackToFileSystem = () => {
   router.push({ name: "FileSystem" });
 };
 
+const POLL_INTERVAL = 5000;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
 onMounted(() => {
   loadList();
+  pollTimer = setInterval(() => {
+    if (!loading.value && !retryingId.value) loadList(undefined, true);
+  }, POLL_INTERVAL);
 });
 
 onBeforeUnmount(() => {
   debouncedLoadList.cancel();
+  if (pollTimer) clearInterval(pollTimer);
 });
 </script>
 
 <style scoped lang="scss">
 .vector-status-page {
   padding: 20px;
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 0 auto;
 }
 

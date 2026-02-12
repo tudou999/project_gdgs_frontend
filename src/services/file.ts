@@ -151,4 +151,11 @@ export const vectorAPI = {
       params: params ?? {},
     });
   },
+
+  // 重试失败的向量任务
+  postRetryVectorTask(storageKey: string) {
+    return apiClient.post(`${FILE_API_BASE_URL}/vector/retry`, null, {
+      params: { storageKey },
+    });
+  },
 };
