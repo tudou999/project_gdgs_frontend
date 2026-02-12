@@ -11,16 +11,16 @@ import {
   watch,
 } from "vue";
 import { Position, Close } from "@element-plus/icons-vue";
-import ChatMessage from "../components/ChatMessage.vue";
-import { chatAPI } from "../services/sessions.js";
-import IconStop from "../components/icons/IconStop.vue";
+import ChatMessage from "../../components/ChatMessage.vue";
+import { chatAPI } from "../../services/sessions.js";
+import IconStop from "../../components/icons/IconStop.vue";
 import { ElMessage } from "element-plus";
-import { ChatMode } from "../interface/Tchat.ts";
-import { messageCache } from "../utils/UtilMessageCacheDB.ts";
-import { useSkeleton } from "../utils/UtilShowSkeleton.ts";
+import { ChatMode } from "../../interface/Tchat.ts";
+import { messageCache } from "../../utils/UtilMessageCacheDB.ts";
+import { useSkeleton } from "../../utils/UtilShowSkeleton.ts";
 
 defineOptions({
-  name: "ChatRecord",
+  name: "Index",
 });
 
 const props = defineProps({

@@ -82,8 +82,8 @@ import { type Ref, ref } from "vue";
 import { useRouter } from "vue-router";
 import { SignAPI, UseAPI } from "@/services/user.ts";
 import { ElMessage } from "element-plus";
-import { useUserStore } from "../stores/user";
-import type { LoginFormType } from "../interface/Tlogin.ts";
+import { useUserStore } from "../../stores/user.ts";
+import type { LoginFormType } from "../../interface/Tlogin.ts";
 
 const router = useRouter();
 const userStore = useUserStore();

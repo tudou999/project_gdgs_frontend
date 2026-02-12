@@ -17,10 +17,10 @@ import {
   onBeforeUnmount,
   onMounted,
 } from "vue";
-import { fileAPI } from "../services/file.ts";
+import { fileAPI } from "../../services/file.ts";
 import { useRoute, useRouter } from "vue-router";
 import { filesize } from "filesize";
-import SystemDashboard from "../components/SystemDashboard.vue";
+import SystemDashboard from "../../components/SystemDashboard.vue";
 import type {
   FileUploadInfo,
   FileShowType,
@@ -28,7 +28,7 @@ import type {
   FileRawInfoType,
   editingType,
   TrailItemType,
-} from "../interface/TfileSystem.ts";
+} from "../../interface/TfileSystem.ts";
 import type { AxiosProgressEvent } from "axios";
 import type { VirtualElement } from "@popperjs/core";
 import { debounce } from "lodash-es";

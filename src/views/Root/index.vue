@@ -70,9 +70,9 @@ defineOptions({
 });
 
 import { ref, onMounted } from "vue";
-import { RootAPI } from "../services/user.ts";
-import type { UserType, PaginationInfoType } from "../interface/Troot.ts";
-import { useGetCode } from "../hooks/useTools.ts";
+import { RootAPI } from "../../services/user.ts";
+import type { UserType, PaginationInfoType } from "../../interface/Troot.ts";
+import { useGetCode } from "../../hooks/useTools.ts";
 
 const loading = ref<boolean>(false); // 加载状态
 const paginationInfo = ref<PaginationInfoType | null>(null); // 分页信息
