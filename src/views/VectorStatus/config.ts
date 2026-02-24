@@ -28,16 +28,34 @@ export const buildVectorStatusParams = (options: {
   pageNum: number;
   pageSize: number;
   keyword?: string;
+  status?: string;
+  start?: string;
+  end?: string;
 }) => {
-  const { pageNum, pageSize, keyword } = options;
+  const { pageNum, pageSize, keyword, status, start, end } = options;
   const params: Record<string, unknown> = {
     pageNum,
     pageSize,
   };
 
-  const trimmed = keyword?.trim();
-  if (trimmed) {
-    params.keyword = trimmed;
+  const trimmedKeyword = keyword?.trim();
+  if (trimmedKeyword) {
+    params.keyword = trimmedKeyword;
+  }
+
+  const trimmedStatus = status?.trim();
+  if (trimmedStatus) {
+    params.status = trimmedStatus;
+  }
+
+  const trimmedStart = start?.trim();
+  if (trimmedStart) {
+    params.start = trimmedStart;
+  }
+
+  const trimmedEnd = end?.trim();
+  if (trimmedEnd) {
+    params.end = trimmedEnd;
   }
 
   return params;

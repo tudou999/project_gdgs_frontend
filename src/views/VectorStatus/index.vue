@@ -13,13 +13,53 @@
         </el-button>
         <h1 class="page-title">向量状态</h1>
       </div>
-      <el-input
-        v-model="searchKeyword"
-        placeholder="按文件名搜索"
-        clearable
-        class="search-input"
-        size="large"
-      />
+      <div class="filter-bar">
+        <el-select
+          v-model="statusFilter"
+          placeholder="按状态筛选"
+          clearable
+          size="default"
+          class="status-select"
+        >
+          <el-option label="全部状态" value="" />
+          <el-option label="待处理" value="PENDING" />
+          <el-option label="处理中" value="PROCESSING" />
+          <el-option label="成功" value="SUCCESS" />
+          <el-option label="失败" value="FAILED" />
+          <el-option label="不支持" value="UNSUPPORTED" />
+        </el-select>
+        <el-config-provider :locale="zhCn">
+          <el-date-picker
+            v-model="dateRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            :default-time="defaultTime"
+            class="date-range-picker"
+          />
+        </el-config-provider>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="按文件名搜索"
+          clearable
+          class="search-input"
+          size="default"
+        />
+        <el-button
+          type="primary"
+          size="default"
+          class="search-button"
+          @click="handleSearch"
+        >
+          查询
+        </el-button>
+        <el-button size="default" class="reset-button" @click="handleReset">
+          清空
+        </el-button>
+      </div>
     </el-header>
 
     <el-main>
@@ -27,8 +67,8 @@
         v-loading="loading"
         size="large"
         :data="tableData"
-        stripe
         style="width: 100%"
+        row-style="height: 60px"
       >
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column
@@ -100,7 +140,7 @@
             <el-button
               v-if="scope.row.status?.toUpperCase() === 'FAILED'"
               type="primary"
-              size="small"
+              size="default"
               :loading="retryingId === scope.row.id"
               @click="handleRetry(scope.row)"
             >
@@ -129,20 +169,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import { ArrowLeft } from "@element-plus/icons-vue";
 import { vectorAPI } from "../../services/file.ts";
 import { filesize } from "filesize";
-import { debounce } from "lodash-es";
 import type { VectorStatusItem, VectorStatusResponse } from "./config.ts";
 import {
   VECTOR_STATUS_PAGE_SIZE_DEFAULT,
   VECTOR_STATUS_PAGE_SIZE_OPTIONS,
-  VECTOR_STATUS_SEARCH_DEBOUNCE,
   buildVectorStatusParams,
 } from "./config.ts";
+import { ElConfigProvider } from "element-plus";
+import zhCn from "element-plus/es/locale/lang/zh-cn";
 
 defineOptions({ name: "VectorStatus" });
 
@@ -153,7 +193,18 @@ const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(VECTOR_STATUS_PAGE_SIZE_DEFAULT);
 const searchKeyword = ref("");
+const statusFilter = ref("");
+const dateRange = ref<[string, string] | null>(null);
+// 实际已生效的查询参数（点击“查询”后同步）
+const appliedSearchKeyword = ref("");
+const appliedStatusFilter = ref("");
+const appliedDateRange = ref<[string, string] | null>(null);
 const retryingId = ref<string | null>(null);
+// 设置选择日期后的默认时间点
+const defaultTime = [
+  new Date(2000, 1, 1, 0, 0, 0), // 起始时间默认 00:00:00
+  new Date(2000, 1, 1, 23, 59, 59), // 结束时间默认 23:59:59
+];
 
 const handleRetry = async (row: VectorStatusItem) => {
   if (!row.id) return;
@@ -161,7 +212,10 @@ const handleRetry = async (row: VectorStatusItem) => {
   const currentParams = {
     pageNum: pageNum.value,
     pageSize: pageSize.value,
-    keyword: searchKeyword.value,
+    keyword: appliedSearchKeyword.value,
+    status: appliedStatusFilter.value,
+    start: appliedDateRange.value?.[0],
+    end: appliedDateRange.value?.[1],
   };
   try {
     const res = await vectorAPI.postRetryVectorTask(row.storageKey);
@@ -184,17 +238,26 @@ const loadList = async (
     pageNum: number;
     pageSize: number;
     keyword: string;
+    status?: string;
+    start?: string;
+    end?: string;
   },
   silent = false,
 ) => {
   if (!silent) loading.value = true;
   try {
+    const [start, end] = Array.isArray(appliedDateRange.value)
+      ? appliedDateRange.value
+      : [undefined, undefined];
     const params = overrideParams
       ? buildVectorStatusParams(overrideParams)
       : buildVectorStatusParams({
           pageNum: pageNum.value,
           pageSize: pageSize.value,
-          keyword: searchKeyword.value,
+          keyword: appliedSearchKeyword.value,
+          status: appliedStatusFilter.value,
+          start,
+          end,
         });
     const res = await vectorAPI.getVectorDBList(params);
     if (res?.code === 200 && res?.data) {
@@ -234,19 +297,26 @@ const onSizeChange = (size: number) => {
   loadList();
 };
 
-// 防抖后的列表加载（搜索用）
-const debouncedLoadList = debounce(() => {
+// 点击“查询”时应用筛选条件并请求后端
+const handleSearch = () => {
+  appliedSearchKeyword.value = searchKeyword.value;
+  appliedStatusFilter.value = statusFilter.value;
+  appliedDateRange.value = dateRange.value;
   pageNum.value = 1;
   loadList();
-}, VECTOR_STATUS_SEARCH_DEBOUNCE);
+};
 
-// 监听搜索关键字变化，使用防抖请求后端
-watch(
-  () => searchKeyword.value,
-  () => {
-    debouncedLoadList();
-  },
-);
+// 点击“清空”时重置所有查询条件并刷新列表
+const handleReset = () => {
+  searchKeyword.value = "";
+  statusFilter.value = "";
+  dateRange.value = null;
+  appliedSearchKeyword.value = "";
+  appliedStatusFilter.value = "";
+  appliedDateRange.value = null;
+  pageNum.value = 1;
+  loadList();
+};
 
 const formatDate = (val: unknown) => {
   if (val == null || val === "") return "-";
@@ -281,16 +351,19 @@ const formatFileSize = (size: unknown) => {
 const statusTagType = (status: unknown) => {
   const s = String(status ?? "").toUpperCase();
   if (s === "SUCCESS") return "success";
-  if (s === "FAILED" || s === "ERROR") return "danger";
-  if (s === "PENDING" || s === "WAITING") return "warning";
+  if (s === "FAILED" || s === "ERROR" || s === "UNSUPPORTED") return "danger";
+  if (s === "PENDING" || s === "WAITING" || s === "PROCESSING")
+    return "warning";
   return "info";
 };
 
 const getStatusText = (status: unknown) => {
   const s = String(status ?? "").toUpperCase();
+  if (s === "PENDING") return "待处理";
+  if (s === "PROCESSING") return "处理中";
   if (s === "SUCCESS") return "成功";
   if (s === "FAILED") return "失败";
-  if (s === "PENDING") return "处理中";
+  if (s === "UNSUPPORTED") return "不支持";
   return status ? String(status) : "-";
 };
 
@@ -309,7 +382,6 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  debouncedLoadList.cancel();
   if (pollTimer) clearInterval(pollTimer);
 });
 </script>
@@ -342,8 +414,27 @@ onBeforeUnmount(() => {
   gap: 20px;
 }
 
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-select {
+  width: 150px;
+}
+
+.date-range-picker {
+  max-width: 360px;
+}
+
 .search-input {
-  max-width: 260px;
+  width: 160px;
+}
+
+.search-button,
+.reset-button {
+  margin-left: 4px;
 }
 
 .pagination-wrapper {
